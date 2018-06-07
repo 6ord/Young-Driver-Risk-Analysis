@@ -13,7 +13,7 @@ I’d like to validate these perceptions by analyzing a dataset that captures ea
 The structured csv dataset from Transport Canada via Kaggle contains under 5.8 million records, each representing a person recorded in the car accident. The 22 attributes include year, number of cars involved, road condition, and the age of the person and injuries. (Full data dictionary attached with submission.) What it does lack, is a grouping by incident, date and location of the accident.
 https://www.kaggle.com/tbsteal/canadian-car-accidents-19942014
 
-Conceptual use of this data can be found here (https://prezi.com/view/LquWzGw3HZMw1s6x849h/) - Light analysis was done between R and Excel Power Pivot. This project will extend the depth of the analysis using as much open source tools as possible.
+Conceptual use of this data can be found here (https://prezi.com/view/LquWzGw3HZMw1s6x849h/) - Light analysis was done between R and Excel Power Pivot. This project will extend the depth of the analysis, with a focus on using open source tools.
 
 # Technique & Tools:
 

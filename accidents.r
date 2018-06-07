@@ -11,9 +11,9 @@ library(pdftools)
 # sc <- spark_connect(master = "local")
 # 
 # sp.accid <- spark_read_csv(sc,name = "accid_tbl"
-#                            ,path = "F:/Marsh/canadian-car-accidents-19942014/NCDB_1999_to_2014.csv"
+#                            ,path = "F:\\Ryerson\\CKME136_Capstone\\repository\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
 #                            ,header = TRUE
-#                           #,stringsAsFactors = FALSE
+#                            ,stringsAsFactors = FALSE
 #                             )
 # select(accid_tbl,C_YEAR)
 
@@ -45,8 +45,8 @@ row.names(defitn.tbl) <- NULL
 colnames(defitn.tbl) <- c('attribute','description')
 
 defitn.tbl$values <- ''
-for (i in 1:22){defitn.tbl$values[i] <- ((unique(accid[i])))}
-for (i in 1:22){defitn.tbl$numNA[i] <- sum(is.na(accid[i]))}
+for (i in 1:22){defitn.tbl$values[i] <- ((unique(accid[i])))
+                defitn.tbl$numNA[i] <- sum(is.na(accid[i]))}
 defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Quan-Discrete','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal')
 
 

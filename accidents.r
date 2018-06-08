@@ -11,9 +11,9 @@ library(pdftools)
 # sc <- spark_connect(master = "local")
 # 
 # sp.accid <- spark_read_csv(sc,name = "accid_tbl"
-#                            ,path = "F:\\Ryerson\\CKME136_Capstone\\repository\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
+#                            ,path = "F:/Marsh/canadian-car-accidents-19942014/NCDB_1999_to_2014.csv"
 #                            ,header = TRUE
-#                            ,stringsAsFactors = FALSE
+#                           #,stringsAsFactors = FALSE
 #                             )
 # select(accid_tbl,C_YEAR)
 
@@ -24,6 +24,8 @@ accid <- read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
                   , header = TRUE
                   , stringsAsFactors = FALSE
                   )
+accid.indiv <- accid
+
 
 # DATA DICTIONARY
 
@@ -45,8 +47,8 @@ row.names(defitn.tbl) <- NULL
 colnames(defitn.tbl) <- c('attribute','description')
 
 defitn.tbl$values <- ''
-for (i in 1:22){defitn.tbl$values[i] <- ((unique(accid[i])))
-                defitn.tbl$numNA[i] <- sum(is.na(accid[i]))}
+for (i in 1:22){defitn.tbl$values[i] <- unique(accid.indiv[i])
+                defitn.tbl$numNA[i] <- sum(is.na(accid.indiv[i]))}
 defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Quan-Discrete','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal')
 
 
@@ -60,12 +62,46 @@ defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordi
 # hist(as.numeric(subset(accid$P_AGE,accid$C_YEAR=='2014')))
 
 x11()
-boxplot(as.numeric(accid$P_AGE)~accid$C_YEAR,accid)
+boxplot(as.numeric(accid.indiv$P_AGE)~accid.indiv$C_YEAR,accid.indiv)
 # lower whisker always at 0??? remove if outlier - children vehicle occupants
-summary(as.numeric(accid$P_AGE))
+summary(as.numeric(accid.indiv$P_AGE))
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
 #     1.0    22.0    34.0    36.4    49.0    99.0  395156 
 
+#Check if User consistent with Position. ex, All User=Driver, Position=Driver (as oppose to 
+#front or rear Passenger)
+#
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='1')$P_PSN)) #Good
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='2')$P_PSN)) #Good
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='3')$P_PSN)) #Suspect
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='4')$P_PSN)) #Suspect
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='5')$P_PSN)) #Suspect
+sort(unique(subset(accid.indiv,accid.indiv$P_USER=='U')$P_PSN)) #Suspect
+
+
+#Build accident occurence ID - concatenation of time and environment
+#Assuming that no two distinct accidents occured at same hour or day, mth, yr
+#and on the same road condition, weather, road formation, etc.
+#
+accid$occurID <- paste(accid$C_YEAR,accid$C_MNTH,accid$C_WDAY,
+                       accid$C_HOUR,'_',accid$C_RCFG,accid$C_WTHR,
+                       accid$C_RSUR,accid$C_RALN,accid$C_TRAF,
+                       sep='')
+
+nrow(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),])
+# not many with unknown veh/person sequence number
+# 436 people records with unknown unknown veh/person
+# sequence number
+
+length(unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID))
+# 256 accident occurence ID's associated with unknown veh/person
+# sequence number
+
+# Remove accid records with unknown veh/person sequence number
+unknownOccur <- unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID)
+accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
+# check
+nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
 
 
 rm(list=ls())

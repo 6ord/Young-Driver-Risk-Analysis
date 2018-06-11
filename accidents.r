@@ -17,6 +17,8 @@ library(pdftools)
 #                             )
 # select(accid_tbl,C_YEAR)
 
+rm(list=ls())
+
 # IMPORTING DATA
 
 setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
@@ -24,7 +26,6 @@ accid <- read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
                   , header = TRUE
                   , stringsAsFactors = FALSE
                   )
-accid.indiv <- accid
 
 
 # DATA DICTIONARY
@@ -50,6 +51,83 @@ defitn.tbl$values <- ''
 for (i in 1:22){defitn.tbl$values[i] <- unique(accid.indiv[i])
                 defitn.tbl$numNA[i] <- sum(is.na(accid.indiv[i]))}
 defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Quan-Discrete','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal')
+
+# CLEANING
+
+accid$occurID <- paste(accid$C_YEAR,accid$C_MNTH,accid$C_WDAY,
+                       accid$C_HOUR,'_',accid$C_RCFG,accid$C_WTHR,
+                       accid$C_RSUR,accid$C_RALN,accid$C_TRAF,'_',
+                       accid$C_VEHS,accid$C_SEV,
+                       sep='')
+
+accid$vehicID <- paste(accid$occurID,'_',accid$V_ID,
+                       accid$V_TYPE,accid$V_YEAR,
+                       sep='')
+
+#Count number of vehIDs within occID
+accid$numVehs <- ave(accid$vehicID,accid$occurID,FUN=function(x)length(unique(x)))
+accid$numVehs <- as.character(accid$numVehs)
+accid$numVehs <- ifelse(nchar(accid$numVehs)<2,paste('0',accid$numVehs,sep=''),accid$numVehs)
+
+accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
+                       accid$P_PSN,
+                       sep='')
+
+
+
+
+# MISSING if any of above ID contains U|X, --OR-- Age of driver unknown
+# Applicable to Occurences - will remove Occurence if any are TRUE
+uv <- c('UU','XX','U','X')
+vehType <- c('01','05','06')
+accid$exclude <- (regexpr('U|X',accid$persnID)>0)|           #Missing time, road condition, etc
+                 (accid$P_USER=='1' & accid$P_AGE %in% uv)|  #Missing Age of Driver
+                 (accid$numVehs!=accid$C_VEHS)|              #Original Veh COunt doesn't match unique num of IDs  
+                 !(accid$V_TYPE %in% vehType)                #Vehicle is not pp or light truck
+
+unique(accid$occurID[which(accid$exclude==TRUE)])
+
+# Remove Occurences where key info is missing ($exclude=TRUE)
+# 
+occurToRemove <- unique(accid$occurID[which(accid$exclude==TRUE)])
+
+
+# REMOVE excluded
+# 
+accid.cln <- accid[which(!(accid$occurID %in% occurToRemove)),]
+# 1.59MM records
+# 590K occurences, spread evenly throughout years - as per below
+# 
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2004')]))
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2006')]))
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2008')]))
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2010')]))
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2012')]))
+length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2014')]))
+
+View(head(accid.cln,200))
+View(head(accid))
+
+nrow(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),])
+# not many with unknown veh/person sequence number
+# 436 people records with unknown unknown veh/person
+# sequence number
+
+length(unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID))
+# 256 accident occurence ID's associated with unknown veh/person
+# sequence number
+
+# Remove accid records with unknown veh/person sequence number
+unknownOccur <- unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID)
+accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
+# check
+nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
+
+
+
+
+accid.indiv <- accid
+
 
 
 # Exploring
@@ -83,25 +161,6 @@ sort(unique(subset(accid.indiv,accid.indiv$P_USER=='U')$P_PSN)) #Suspect
 #Assuming that no two distinct accidents occured at same hour or day, mth, yr
 #and on the same road condition, weather, road formation, etc.
 #
-accid$occurID <- paste(accid$C_YEAR,accid$C_MNTH,accid$C_WDAY,
-                       accid$C_HOUR,'_',accid$C_RCFG,accid$C_WTHR,
-                       accid$C_RSUR,accid$C_RALN,accid$C_TRAF,
-                       sep='')
-
-nrow(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),])
-# not many with unknown veh/person sequence number
-# 436 people records with unknown unknown veh/person
-# sequence number
-
-length(unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID))
-# 256 accident occurence ID's associated with unknown veh/person
-# sequence number
-
-# Remove accid records with unknown veh/person sequence number
-unknownOccur <- unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID)
-accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
-# check
-nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
 
 
 rm(list=ls())

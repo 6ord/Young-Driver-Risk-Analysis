@@ -1,6 +1,10 @@
 # install.packages("sparklyr")
 library(sparklyr)
 
+# install.packages("data.table")
+# library(data.table)
+# Tried data.table, no noticable difference in run times. Code is simpler though.
+
 # install.packages("pdftools")
 library(pdftools)
 
@@ -22,91 +26,141 @@ rm(list=ls())
 # IMPORTING DATA
 
 setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
-accid <- read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
-                  , header = TRUE
-                  , stringsAsFactors = FALSE
-                  )
+accid <- #as.data.table(
+                       read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
+                                , header = TRUE
+                                , stringsAsFactors = FALSE
+                                )
+        #               )
 
 
-# DATA DICTIONARY
+###########################################################################
+##################### Section 1: DATA DICTIONARY ##########################
+###########################################################################
 
 dataDictionary <- pdf_text(".\\canadian-car-accidents-19942014\\drivingLegend.pdf")
 
+# Capture first page of PDF
+# 
 dd.defitn <- unlist(strsplit(dataDictionary,'\n')[1])
 #dd.values <- unlist(strsplit(dataDictionary,'\n')[2:11])
 
+# Remove sub-headings for a clean table
+# 
 dd.defitn <- c(dd.defitn[3:14],
                dd.defitn[16:18],
                dd.defitn[20:26])
 
+# Initialize data definition data frame, based on the first page of PDF above,
+# with just attribute code and attribute name.
+# 
 defitn.tbl <- as.data.frame(cbind(sapply(dd.defitn,function(x){gsub(' ','',substr(x,1,8))}),
                                   sapply(dd.defitn,function(x){substr(x,44,nchar(x)-1)})
                                   ))
 rm(dd.defitn)
-
 row.names(defitn.tbl) <- NULL
 colnames(defitn.tbl) <- c('attribute','description')
 
+# Add columns to data definition dataframe defitn.tbl:
+# - unique values under each attribute
+# - number of missing values ('U' and 'X') under each attribute
+# - attribute type
+# 
+missingVal <- c('UU','XX','U','X')
 defitn.tbl$values <- ''
-for (i in 1:22){defitn.tbl$values[i] <- unique(accid.indiv[i])
-                defitn.tbl$numNA[i] <- sum(is.na(accid.indiv[i]))}
+for (i in 1:22){defitn.tbl$values[i] <- unique(accid[i])
+                defitn.tbl$numNA[i] <- sum(accid[,i] %in% missingVal)
+                }
 defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Quan-Discrete','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal')
 
-# CLEANING
+# Check how many drivers are missing age
+sum(subset(accid,accid$P_USER=='1')$P_AGE %in% missingVal)
+# 150K+
+
+#View(defitn.tbl)
+
+###########################################################################
+#####################  Section 2: DATA CLEANING  ##########################
+###########################################################################
 
 accid$occurID <- paste(accid$C_YEAR,accid$C_MNTH,accid$C_WDAY,
                        accid$C_HOUR,'_',accid$C_RCFG,accid$C_WTHR,
                        accid$C_RSUR,accid$C_RALN,accid$C_TRAF,'_',
-                       accid$C_VEHS,accid$C_SEV,
+                       accid$C_CONF,accid$C_VEHS,accid$C_SEV,
                        sep='')
 
 accid$vehicID <- paste(accid$occurID,'_',accid$V_ID,
                        accid$V_TYPE,accid$V_YEAR,
                        sep='')
 
-#Count number of vehIDs within occID
-accid$numVehs <- ave(accid$vehicID,accid$occurID,FUN=function(x)length(unique(x)))
-accid$numVehs <- as.character(accid$numVehs)
+# Count number of vehIDs within occID
+accid$numVehs <- as.character(ave(accid$vehicID,accid$occurID,FUN=function(x)length(unique(x))))
 accid$numVehs <- ifelse(nchar(accid$numVehs)<2,paste('0',accid$numVehs,sep=''),accid$numVehs)
 
+# Original dataset had count of vehicles in accident. Check if above step yielded same
+# vehicle counts.
+nrow(subset(accid,accid$numVehs!=accid$C_VEHS)) #/nrow(accid)
+# 2MM records did not match, out of 5.8MM -  34%
+
 accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
-                       accid$P_PSN,
+                       accid$P_PSN,accid$P_ISEV,
+                       accid$P_SAFE,accid$P_USER,
                        sep='')
-
-
-
 
 # MISSING if any of above ID contains U|X, --OR-- Age of driver unknown
 # Applicable to Occurences - will remove Occurence if any are TRUE
-uv <- c('UU','XX','U','X')
+
 vehType <- c('01','05','06')
-accid$exclude <- (regexpr('U|X',accid$persnID)>0)|           #Missing time, road condition, etc
-                 (accid$P_USER=='1' & accid$P_AGE %in% uv)|  #Missing Age of Driver
-                 (accid$numVehs!=accid$C_VEHS)|              #Original Veh COunt doesn't match unique num of IDs  
-                 !(accid$V_TYPE %in% vehType)                #Vehicle is not pp or light truck
+accid$exclude <- (regexpr('U|X',accid$persnID)>0)|                   #Missing time, road condition, injury info, etc
+                 (accid$P_USER=='1' & accid$P_AGE %in% missingVal)|  #Missing Age of Driver
+                 (accid$numVehs!=accid$C_VEHS)|                      #Original Veh COunt doesn't match unique num of IDs  
+                 !(accid$V_TYPE %in% vehType)                        #Vehicle is not priv passenger, van or light truck
 
-unique(accid$occurID[which(accid$exclude==TRUE)])
-
-# Remove Occurences where key info is missing ($exclude=TRUE)
+# To Remove entire Occurences if it contains at least 1 record with
+# missing key info ($exclude=TRUE)
 # 
 occurToRemove <- unique(accid$occurID[which(accid$exclude==TRUE)])
 
+# Quick Metrics
+# 
+length(unique(accid$occurID[which(accid$exclude==TRUE)]))/length(unique(accid$occurID))
+# 61% of occurrence IDs will be excluded
+nrow(subset(accid,accid$occurID %in% occurToRemove))/nrow(accid)
+# 67% of all records will be removed
 
 # REMOVE excluded
 # 
 accid.cln <- accid[which(!(accid$occurID %in% occurToRemove)),]
-# 1.59MM records
-# 590K occurences, spread evenly throughout years - as per below
-# 
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2004')]))
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2006')]))
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2008')]))
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2010')]))
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2012')]))
-length(unique(accid.cln$occurID[which(accid.cln$C_YEAR=='2014')]))
+nrow(accid.cln)
+length(unique(accid.cln$occurID))
+# 1.9MM records
+# 721K occurences, spread reasonably even throughout years - as per below
+for (i in 1999:2014){print(length(unique(accid.cln$occurID[which(accid.cln$C_YEAR==i)])))}
 
-View(head(accid.cln,200))
-View(head(accid))
+## Quick Data Summary Table for cleaned data
+##
+defitn.tbl.cln <- defitn.tbl
+for (i in 1:22){defitn.tbl.cln$values[i] <- unique(accid.cln[i])
+                defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
+}
+#View(defitn.tbl.cln)
+
+
+###########################################################################
+#####################  Section 3: DATA ANALYSIS  ##########################
+###########################################################################
+
+# remove C_SEV, we have P_ISEV
+# remove P_PSN, we have P_USER
+# remove gender
+# remove numVehs, exclude
+# modify P_SAFE to restrictive, preventative, none, other
+
+
+# Example: dataset <- dataset[,c(1:2, 6, 3:5)]
+
+
+######  SAND BOX  ######
 
 nrow(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),])
 # not many with unknown veh/person sequence number
@@ -122,12 +176,6 @@ unknownOccur <- unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID)
 accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
 # check
 nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
-
-
-
-
-accid.indiv <- accid
-
 
 
 # Exploring

@@ -93,7 +93,7 @@ accid$vehicID <- paste(accid$occurID,'_',accid$V_ID,
                        accid$V_TYPE,accid$V_YEAR,
                        sep='')
 
-# Count number of vehIDs within occID
+# Save Count of vehIDs within occID to numVehs
 accid$numVehs <- as.character(ave(accid$vehicID,accid$occurID,FUN=function(x)length(unique(x))))
 accid$numVehs <- ifelse(nchar(accid$numVehs)<2,paste('0',accid$numVehs,sep=''),accid$numVehs)
 
@@ -110,7 +110,7 @@ accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
 # MISSING if any of above ID contains U|X, --OR-- Age of driver unknown
 # Applicable to Occurences - will remove Occurence if any are TRUE
 
-vehType <- c('01','05','06')
+vehType <- c('01','05','06')    #Private passenger, vans, light trucks
 accid$exclude <- (regexpr('U|X',accid$persnID)>0)|                   #Missing time, road condition, injury info, etc
                  (accid$P_USER=='1' & accid$P_AGE %in% missingVal)|  #Missing Age of Driver
                  (accid$numVehs!=accid$C_VEHS)|                      #Original Veh COunt doesn't match unique num of IDs  
@@ -137,13 +137,13 @@ length(unique(accid.cln$occurID))
 # 721K occurences, spread reasonably even throughout years - as per below
 for (i in 1999:2014){print(length(unique(accid.cln$occurID[which(accid.cln$C_YEAR==i)])))}
 
-## Quick Data Summary Table for cleaned data
+## Another Data Summary Table for cleaned data
 ##
 defitn.tbl.cln <- defitn.tbl
 for (i in 1:22){defitn.tbl.cln$values[i] <- unique(accid.cln[i])
                 defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
 }
-#View(defitn.tbl.cln)
+View(defitn.tbl.cln)
 
 
 ###########################################################################
@@ -177,7 +177,6 @@ accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
 # check
 nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
 
-
 # Exploring
 
 # x11()
@@ -204,16 +203,13 @@ sort(unique(subset(accid.indiv,accid.indiv$P_USER=='4')$P_PSN)) #Suspect
 sort(unique(subset(accid.indiv,accid.indiv$P_USER=='5')$P_PSN)) #Suspect
 sort(unique(subset(accid.indiv,accid.indiv$P_USER=='U')$P_PSN)) #Suspect
 
-
-#Build accident occurence ID - concatenation of time and environment
-#Assuming that no two distinct accidents occured at same hour or day, mth, yr
-#and on the same road condition, weather, road formation, etc.
-#
-
-
-rm(list=ls())
-View(head(accid))
-str(accid)
+                                  
+                                  
+                                  
+###############################################################################
+### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD 
+###############################################################################
+                                  
 sum(is.na(accid$P_ISEV))
 summary(accid$P_ISEV)$coefficients
 ?summary

@@ -7,7 +7,7 @@ library(sparklyr)
 
 # install.packages("pdftools")
 library(pdftools)
-
+library(ggplot2)
 # spark_install(version = "2.1.0")
 # devtools::install_github("rstudio/sparklyr")
 
@@ -27,11 +27,11 @@ rm(list=ls())
 
 setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
 accid <- #as.data.table(
-                       read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
-                                , header = TRUE
-                                , stringsAsFactors = FALSE
-                                )
-        #               )
+  read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
+           , header = TRUE
+           , stringsAsFactors = FALSE
+  )
+#               )
 
 
 ###########################################################################
@@ -56,7 +56,7 @@ dd.defitn <- c(dd.defitn[3:14],
 # 
 defitn.tbl <- as.data.frame(cbind(sapply(dd.defitn,function(x){gsub(' ','',substr(x,1,8))}),
                                   sapply(dd.defitn,function(x){substr(x,44,nchar(x)-1)})
-                                  ))
+                              ))
 rm(dd.defitn)
 row.names(defitn.tbl) <- NULL
 colnames(defitn.tbl) <- c('attribute','description')
@@ -68,10 +68,11 @@ colnames(defitn.tbl) <- c('attribute','description')
 # 
 missingVal <- c('UU','XX','U','X')
 defitn.tbl$values <- ''
-for (i in 1:22){defitn.tbl$values[i] <- unique(accid[i])
-                defitn.tbl$numNA[i] <- sum(accid[,i] %in% missingVal)
-                }
 defitn.tbl$attrType <- c('Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Qual-Ordinal','Quan-Discrete','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Ordinal','Qual-Nominal','Qual-Ordinal','Qual-Nominal','Qual-Nominal','Qual-Nominal','Qual-Nominal')
+
+for (i in 1:22){defitn.tbl$values[i] <- unique(accid[i])
+defitn.tbl$numNA[i] <- sum(accid[,i] %in% missingVal)
+}
 
 # Check how many drivers are missing age
 sum(subset(accid,accid$P_USER=='1')$P_AGE %in% missingVal)
@@ -141,13 +142,125 @@ for (i in 1999:2014){print(length(unique(accid.cln$occurID[which(accid.cln$C_YEA
 ##
 defitn.tbl.cln <- defitn.tbl
 for (i in 1:22){defitn.tbl.cln$values[i] <- unique(accid.cln[i])
-                defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
+defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
 }
 View(defitn.tbl.cln)
 
 
 ###########################################################################
-#####################  Section 3: DATA ANALYSIS  ##########################
+###################  Section 3: PRELIM DATA TRENDS  #######################
+###########################################################################
+
+NAFdrv.boxplot.data <- accid.cln[accid.cln$P_USER=='1'&
+                                accid.cln$P_AGE!='NN'&
+                                as.numeric(accid.cln$V_ID)>1,]
+
+AFdrv.boxplot.data <- accid.cln[accid.cln$P_USER=='1'&
+                                accid.cln$P_AGE!='NN'&
+                                as.numeric(accid.cln$V_ID)==1,]
+
+x11()       
+boxplot(as.numeric(NAFdrv.boxplot.data$P_AGE)~NAFdrv.boxplot.data$C_YEAR
+        ,NAFdrv.boxplot.data
+        ,horizontal=TRUE
+        ,main='Age Distribution of NAF Drivers'
+        )
+
+x11()       
+boxplot(as.numeric(AFdrv.boxplot.data$P_AGE)~AFdrv.boxplot.data$C_YEAR
+        ,AFdrv.boxplot.data
+        ,horizontal=TRUE
+        ,main='Age Distribution of AF Drivers'
+        )
+
+# Summary of AF and NAF driver age
+summary(as.numeric(AFdrv.boxplot.data$P_AGE))
+summary(as.numeric(NAFdrv.boxplot.data$P_AGE))
+
+# Build Age Groups
+AFdrv.boxplot.data$P_AGE_r <- cut(as.numeric(AFdrv.boxplot.data$P_AGE),
+                                  breaks = c(0,17,26,36,50,65,99),
+                                  labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
+                                  right=FALSE)
+NAFdrv.boxplot.data$P_AGE_r <- cut(as.numeric(NAFdrv.boxplot.data$P_AGE),
+                                  breaks = c(0,17,26,36,50,65,99),
+                                  labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
+                                  right=FALSE)
+# Build Time of Day
+AFdrv.boxplot.data$C_HOUR_r <- cut(as.numeric(AFdrv.boxplot.data$C_HOUR),
+                                  breaks = c(0,5,8,10,12,14,17,19,21,24),
+                                  labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
+                                             'PM','PM_rush','PM_evening','PM_late'),
+                                  right=FALSE)
+NAFdrv.boxplot.data$C_HOUR_r <- cut(as.numeric(NAFdrv.boxplot.data$C_HOUR),
+                                   breaks = c(0,5,8,10,12,14,17,19,21,24),
+                                   labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
+                                              'PM','PM_rush','PM_evening','PM_late'),
+                                   right=FALSE)
+#Check
+#
+unique(NAFdrv.boxplot.data[NAFdrv.boxplot.data$C_HOUR_r=='overnight',]$C_HOUR)
+unique(NAFdrv.boxplot.data[NAFdrv.boxplot.data$C_HOUR_r=='PM_late',]$C_HOUR)
+# OK
+
+#Summary: number of accidents for age group, time of day
+NAF_agg <- aggregate(occurID~C_HOUR_r+P_AGE_r,NAFdrv.boxplot.data,FUN=function(x){length(unique(x))})
+AF_agg <- aggregate(occurID~C_HOUR_r+P_AGE_r,AFdrv.boxplot.data,FUN=function(x){length(unique(x))})
+
+# CREDIT: https://stackoverflow.com/questions/26794236/ggplot2-3d-bar-plot
+library(latticeExtra)
+x11()
+cloud(occurID~C_HOUR_r+P_AGE_r, NAF_agg, panel.3d.cloud=panel.3dbars, col.facet='grey', 
+      xbase=0.4, ybase=0.4, scales=list(arrows=FALSE, col=1), 
+      par.settings = list(axis.line = list(col = "transparent")),
+      zlab='NAF Drivers')
+x11()
+cloud(occurID~C_HOUR_r+P_AGE_r, AF_agg, panel.3d.cloud=panel.3dbars, col.facet='grey', 
+      xbase=0.4, ybase=0.4, scales=list(arrows=FALSE, col=1), 
+      par.settings = list(axis.line = list(col = "transparent")),
+      zlab='AF Drivers')
+
+
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @@@@@@@@@@@@@@@@@@@@@@ SAND BOX @@@@@@@@@@@@@@@@@@@@@@
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ 
+accid.sev.tbl <- data.frame('year' = 1999:2014,
+                            'fatal'= length(unique(accid.cln[accid.cln$C_YEAR=1999:2014&accid.cln$C_SEV='1'])$occurID),
+                            'non-fatal'= length(unique(accid.cln[accid.cln$C_YEAR=1999:2014&accid.cln$C_SEV='2'])$occurID)
+                            )
+                           
+                             
+x11()
+ggplot(accid.cln, aes(x=C_YEAR, y=unique(occurID), fill=C_SEV)) +
+  geom_histogram()
+
+# Check how many records with P_ISEV=1, have same occurID as P_ISEV=2 or 3?
+(sum(subset(accid.cln,accid.cln$P_ISEV=='1')$occurID %in%
+     unique(subset(accid.cln,accid.cln$P_ISEV=='2'|accid.cln$P_ISEV=='3')$occurID)))/
+nrow(subset(accid.cln,accid.cln$P_ISEV=='1'))
+# 100%
+# In other words, there are no collisions in the cleaned dataset, where nobody was reported 
+# injured. Thus, we can stick with using C_SEV as is. No need to seperate Non-Fatal (2) into
+# Injured or Not-Injured.
+
+
+
+#Check if User consistent with Position. ex, All User=Driver, Position=Driver (as oppose to 
+#front or rear Passenger)
+#
+sort(unique(subset(accid.cln,accid.cln$P_USER=='1')$P_PSN)) #Good
+sort(unique(subset(accid.cln,accid.cln$P_USER=='2')$P_PSN)) #Good
+sort(unique(subset(accid.cln,accid.cln$P_USER=='3')$P_PSN)) #Suspect
+sort(unique(subset(accid.cln,accid.cln$P_USER=='4')$P_PSN)) #Suspect
+sort(unique(subset(accid.cln,accid.cln$P_USER=='5')$P_PSN)) #Suspect
+sort(unique(subset(accid.cln,accid.cln$P_USER=='U')$P_PSN)) #Suspect
+
+
+
+
+###########################################################################
+#####################  Section 4: DATA ANALYSIS  ##########################
 ###########################################################################
 
 # remove C_SEV, we have P_ISEV
@@ -177,39 +290,12 @@ accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
 # check
 nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
 
-# Exploring
 
-# x11()
-# hist(as.numeric(accid$P_AGE))
-# hist(as.numeric(subset(accid$P_AGE,accid$C_YEAR=='1999')))
-# hist(as.numeric(subset(accid$P_AGE,accid$C_YEAR=='2004')))
-# hist(as.numeric(subset(accid$P_AGE,accid$C_YEAR=='2009')))
-# hist(as.numeric(subset(accid$P_AGE,accid$C_YEAR=='2014')))
 
-x11()
-boxplot(as.numeric(accid.indiv$P_AGE)~accid.indiv$C_YEAR,accid.indiv)
-# lower whisker always at 0??? remove if outlier - children vehicle occupants
-summary(as.numeric(accid.indiv$P_AGE))
-#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
-#     1.0    22.0    34.0    36.4    49.0    99.0  395156 
-
-#Check if User consistent with Position. ex, All User=Driver, Position=Driver (as oppose to 
-#front or rear Passenger)
-#
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='1')$P_PSN)) #Good
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='2')$P_PSN)) #Good
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='3')$P_PSN)) #Suspect
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='4')$P_PSN)) #Suspect
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='5')$P_PSN)) #Suspect
-sort(unique(subset(accid.indiv,accid.indiv$P_USER=='U')$P_PSN)) #Suspect
-
-                                  
-                                  
-                                  
 ###############################################################################
 ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD 
 ###############################################################################
-                                  
+
 sum(is.na(accid$P_ISEV))
 summary(accid$P_ISEV)$coefficients
 ?summary
@@ -224,19 +310,19 @@ test <- accid[which(accid$V_TYPE=='01'
                     #&accid$C_YEAR %in% seq(1999,2001,by=1)
                     &accid$C_YEAR==2001
                     &accid$C_VEHS %in% c('01','02','03')
-                    ),]
+),]
 
 test$C_ID <- paste(test$C_YEAR
                    ,test$C_MNTH
                    ,test$C_WDAY
                    ,test$C_HOUR
                    ,test$C_CONF
-                  ,test$C_RCFG
-                  ,test$C_WTHR
-                  ,test$C_RSUR
-                  ,test$C_RALN
-                  ,test$C_TRAF
-                  ,sep='')
+                   ,test$C_RCFG
+                   ,test$C_WTHR
+                   ,test$C_RSUR
+                   ,test$C_RALN
+                   ,test$C_TRAF
+                   ,sep='')
 
 # remove incidents where # cars not equal # drivers - could have been identical seperate collisions
 # or involving pedestrians, bikes, which I removed the other parties.
@@ -263,24 +349,24 @@ test$C_DRVS[which(test$C_ID==IncidIndex[4000])]
 
 
 myaccid.2014 <- accid[which(accid$V_TYPE=='01'
-                      #&accid$C_MNTH=='02' #feb
-                      #&accid$C_YEAR %in% seq(1999,2014,by=5)
-                      &accid$C_YEAR==2014
-                      &accid$C_VEHS %in% c('01','02','03')
-                      ),]
+                            #&accid$C_MNTH=='02' #feb
+                            #&accid$C_YEAR %in% seq(1999,2014,by=5)
+                            &accid$C_YEAR==2014
+                            &accid$C_VEHS %in% c('01','02','03')
+),]
 
 myaccid.2014$C_ID <- paste(myaccid.2014$C_YEAR
-                      ,myaccid.2014$C_MNTH
-                      ,myaccid.2014$C_WDAY
-                      ,myaccid.2014$C_HOUR
-                      ,"_"
-                    ,myaccid.2014$C_CONF
-                    ,myaccid.2014$C_RCFG
-                    ,myaccid.2014$C_WTHR
-                    ,myaccid.2014$C_RSUR
-                    ,myaccid.2014$C_RALN
-                    ,myaccid.2014$C_TRAF
-                    ,sep='')
+                           ,myaccid.2014$C_MNTH
+                           ,myaccid.2014$C_WDAY
+                           ,myaccid.2014$C_HOUR
+                           ,"_"
+                           ,myaccid.2014$C_CONF
+                           ,myaccid.2014$C_RCFG
+                           ,myaccid.2014$C_WTHR
+                           ,myaccid.2014$C_RSUR
+                           ,myaccid.2014$C_RALN
+                           ,myaccid.2014$C_TRAF
+                           ,sep='')
 
 # remove incidents where # cars not equal # drivers - could have been identical seperate collisions
 # or involving pedestrians, bikes, which I removed the other parties.
@@ -317,13 +403,13 @@ head(myaccid)
 
 
 accid2.1999 <- read.csv("F:/Marsh/accidents_1999_preStage2.csv"
-                  ,header = TRUE,stringsAsFactors = FALSE)
+                        ,header = TRUE,stringsAsFactors = FALSE)
 accid2.2004 <- read.csv("F:/Marsh/accidents_2004_preStage2.csv"
-                  ,header = TRUE,stringsAsFactors = FALSE)
+                        ,header = TRUE,stringsAsFactors = FALSE)
 accid2.2009 <- read.csv("F:/Marsh/accidents_2009_preStage2.csv"
-                  ,header = TRUE,stringsAsFactors = FALSE)
+                        ,header = TRUE,stringsAsFactors = FALSE)
 accid2.2014 <- read.csv("F:/Marsh/accidents_2014_preStage2.csv"
-                  ,header = TRUE,stringsAsFactors = FALSE)
+                        ,header = TRUE,stringsAsFactors = FALSE)
 
 names(accid2.1999)[1] <- paste("C_ID")
 names(accid2.2004)[1] <- paste("C_ID")

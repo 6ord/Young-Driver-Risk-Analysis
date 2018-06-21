@@ -113,9 +113,9 @@ accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
 
 vehType <- c('01','05','06')    #Private passenger, vans, light trucks
 accid$exclude <- (regexpr('U|X',accid$persnID)>0)|                   #Missing time, road condition, injury info, etc
-                 (accid$P_USER=='1' & accid$P_AGE %in% missingVal)|  #Missing Age of Driver
-                 (accid$numVehs!=accid$C_VEHS)|                      #Original Veh COunt doesn't match unique num of IDs  
-                 !(accid$V_TYPE %in% vehType)                        #Vehicle is not priv passenger, van or light truck
+                 (accid$P_USER=='1' & accid$P_AGE %in% missingVal)  #Missing Age of Driver
+                 #|(accid$numVehs!=accid$C_VEHS)                      #Original Veh COunt doesn't match unique num of IDs  
+                 #|!(accid$V_TYPE %in% vehType)                        #Vehicle is not priv passenger, van or light truck
 
 # To Remove entire Occurences if it contains at least 1 record with
 # missing key info ($exclude=TRUE)
@@ -150,53 +150,153 @@ View(defitn.tbl.cln)
 ###########################################################################
 ###################  Section 3: PRELIM DATA TRENDS  #######################
 ###########################################################################
+# - C_VEHS & C_CONF NOT CONSISTENT!!!
 
-NAFdrv.boxplot.data <- accid.cln[accid.cln$P_USER=='1'&
-                                accid.cln$P_AGE!='NN'&
-                                as.numeric(accid.cln$V_ID)>1,]
 
-AFdrv.boxplot.data <- accid.cln[accid.cln$P_USER=='1'&
-                                accid.cln$P_AGE!='NN'&
-                                as.numeric(accid.cln$V_ID)==1,]
+
+NAFdrvs <- accid.cln[accid.cln$P_USER=='1'&
+                     accid.cln$P_AGE!='NN'&
+                     as.numeric(accid.cln$V_ID)>1,]
+
+AFdrvs <- accid.cln[accid.cln$P_USER=='1'&
+                    accid.cln$P_AGE!='NN'&
+                    as.numeric(accid.cln$V_ID)==1,]
+
 
 x11()       
-boxplot(as.numeric(NAFdrv.boxplot.data$P_AGE)~NAFdrv.boxplot.data$C_YEAR
-        ,NAFdrv.boxplot.data
+boxplot(as.numeric(NAFdrvs$P_AGE)~NAFdrvs$C_YEAR
+        ,NAFdrvs
         ,horizontal=TRUE
         ,main='Age Distribution of NAF Drivers'
         )
 
 x11()       
-boxplot(as.numeric(AFdrv.boxplot.data$P_AGE)~AFdrv.boxplot.data$C_YEAR
-        ,AFdrv.boxplot.data
+boxplot(as.numeric(AFdrvs$P_AGE)~AFdrvs$C_YEAR
+        ,AFdrvs
         ,horizontal=TRUE
         ,main='Age Distribution of AF Drivers'
         )
 
 # Summary of AF and NAF driver age
-summary(as.numeric(AFdrv.boxplot.data$P_AGE))
-summary(as.numeric(NAFdrv.boxplot.data$P_AGE))
+summary(as.numeric(AFdrvs$P_AGE))
+summary(as.numeric(NAFdrvs$P_AGE))
 
 # Build Age Groups
-AFdrv.boxplot.data$P_AGE_r <- cut(as.numeric(AFdrv.boxplot.data$P_AGE),
+AFdrvs$P_AGE_r <- cut(as.numeric(AFdrvs$P_AGE),
                                   breaks = c(0,17,26,36,50,65,99),
                                   labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
                                   right=FALSE)
-NAFdrv.boxplot.data$P_AGE_r <- cut(as.numeric(NAFdrv.boxplot.data$P_AGE),
+NAFdrvs$P_AGE_r <- cut(as.numeric(NAFdrvs$P_AGE),
                                   breaks = c(0,17,26,36,50,65,99),
                                   labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
                                   right=FALSE)
 # Build Time of Day
-AFdrv.boxplot.data$C_HOUR_r <- cut(as.numeric(AFdrv.boxplot.data$C_HOUR),
+AFdrvs$C_HOUR_r <- cut(as.numeric(AFdrvs$C_HOUR),
                                   breaks = c(0,5,8,10,12,14,17,19,21,24),
                                   labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
                                              'PM','PM_rush','PM_evening','PM_late'),
                                   right=FALSE)
-NAFdrv.boxplot.data$C_HOUR_r <- cut(as.numeric(NAFdrv.boxplot.data$C_HOUR),
+NAFdrvs$C_HOUR_r <- cut(as.numeric(NAFdrvs$C_HOUR),
                                    breaks = c(0,5,8,10,12,14,17,19,21,24),
                                    labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
                                               'PM','PM_rush','PM_evening','PM_late'),
                                    right=FALSE)
+
+# Build Time of week
+AFdrvs$C_WDAY_r <- cut(as.numeric(AFdrvs$C_WDAY),
+                                  breaks = c(1,6,8),
+                                  labels = c('wkdy','wknd'),
+                                  right=FALSE)
+NAFdrvs$C_WDAY_r <- cut(as.numeric(NAFdrvs$C_WDAY),
+                                   breaks = c(1,6,8),
+                                   labels = c('wkdy','wknd'),
+                                   right=FALSE)
+
+# Build Collision Config
+accid.cln$C_CONF_temp <- accid.cln$C_CONF
+accid.cln$C_CONF_temp <- gsub('41','00',accid.cln$C_CONF_temp)
+accid.cln$C_CONF_temp <- gsub('QQ','88',accid.cln$C_CONF_temp)
+accid.cln$C_CONF_r <- cut(as.numeric(accid.cln$C_CONF_temp),
+                                   breaks = c(0,3,6,21,31,88,99),
+                                   labels = c('single_colln','single_lctrl','single_othr',
+                                              'two_OneDir','two_multiDir','other'),
+                                   right=FALSE)
+accid.cln$C_CONF_temp <- NULL
+
+
+# Build road Config
+# CREDIT: https://stackoverflow.com/questions/19441092/how-can-i-create-an-infix-between-operator
+# 
+'%bw%'<-function(x,rng) x>=rng[1] & x<=rng[2]
+
+accid.cln$C_RCFG_temp <- accid.cln$C_RCFG
+accid.cln$C_RCFG_temp <- gsub('QQ','99',accid.cln$C_RCFG_temp)
+accid.cln$C_RCFG_temp <- as.numeric(accid.cln$C_RCFG_temp)
+accid.cln$C_RCFG_r <- ''
+
+accid.cln[which(accid.cln$C_RCFG_temp %bw% c(2,3)),]$C_RCFG_r <- 'intersctn'
+accid.cln[which(accid.cln$C_RCFG_temp %bw% c(4,6)|accid.cln$C_RCFG_temp==1),]$C_RCFG_r <- 'city'
+accid.cln[which(accid.cln$C_RCFG_temp==7),]$C_RCFG_r <- 'passLane'
+accid.cln[which(accid.cln$C_RCFG_temp==8),]$C_RCFG_r <- 'ramp'
+accid.cln[which(accid.cln$C_RCFG_temp==9),]$C_RCFG_r <- 'traffCrcle'
+accid.cln[which(accid.cln$C_RCFG_temp %bw% c(10,12)),]$C_RCFG_r <- 'hwy'
+accid.cln[which(accid.cln$C_RCFG_temp==99),]$C_RCFG_r <- 'other'
+accid.cln$C_RCFG_temp <- NULL
+accid.cln$C_RCFG_r <- as.factor(accid.cln$C_RCFG_r)
+
+
+#Weather and Rd Surface redundent? (C_WTHR vs C_RSUR)
+#
+rdVsWthr <- as.data.frame(cbind(road=accid.cln$C_RSUR,
+                                wthr=accid.cln$C_WTHR))
+#group some roads so have same length as wther
+rdVsWthr[which(rdVsWthr$road %in% c('7','8')),]$road <- '6'
+
+rdVsWthr$road = factor(rdVsWthr$road,
+                       levels=c('1','2','3',
+                                '4','5','6',
+                                '9','Q'))
+chisq.test(rdVsWthr$road,rdVsWthr$wthr,correct=FALSE)
+# Pearson's Chi-squared test
+# 
+# data:  rdVsWthr$road and rdVsWthr$wthr
+# X-squared = 2865700, df = 49, p-value <
+# 2.2e-16
+# 
+# small p-value, fail to reject H0 that rd and wthr
+# are independent. They are dependent of one another.
+# Manual review below reveal anything goes! Road can
+# be dry when it's raining or snowing! Only trend is
+# it's not snowing or icy when road is flooded.
+unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
+
+
+# Build traffic Control
+# 
+
+accid.cln$C_TRAF_temp <- accid.cln$C_TRAF
+accid.cln$C_TRAF_temp <- gsub('QQ','99',accid.cln$C_TRAF_temp)
+accid.cln$C_TRAF_temp <- as.numeric(accid.cln$C_TRAF_temp)
+accid.cln$C_TRAF_r <- ''
+
+accid.cln[which(accid.cln$C_TRAF_temp %bw% c(3,6)|
+                accid.cln$C_TRAF_temp %bw% c(9,12)),]$C_TRAF_r <- 'signage'
+accid.cln[which(accid.cln$C_TRAF_temp %bw% c(7,8)),]$C_TRAF_r <- 'person'
+accid.cln[which(accid.cln$C_TRAF_temp %bw% c(13,14)),]$C_TRAF_r <- 'schBus'
+accid.cln[which(accid.cln$C_TRAF_temp %bw% c(15,16)),]$C_TRAF_r <- 'rail'
+accid.cln[which(accid.cln$C_TRAF_temp==18),]$C_TRAF_r <- 'none'
+accid.cln[which(accid.cln$C_TRAF_temp==17|
+                accid.cln$C_TRAF_temp==99),]$C_TRAF_r <- 'other'
+
+accid.cln[which(accid.cln$C_TRAF_temp==1),]$C_TRAF_r <- 'lights_op'
+accid.cln[which(accid.cln$C_TRAF_temp==2),]$C_TRAF_r <- 'lights_np'
+
+accid.cln$C_TRAF_temp <- NULL
+accid.cln$C_TRAF_r <- as.factor(accid.cln$C_TRAF_r)
+
+
+
+
 #Check
 #
 unique(NAFdrv.boxplot.data[NAFdrv.boxplot.data$C_HOUR_r=='overnight',]$C_HOUR)
@@ -208,18 +308,20 @@ NAF_agg <- aggregate(occurID~C_HOUR_r+P_AGE_r,NAFdrv.boxplot.data,FUN=function(x
 AF_agg <- aggregate(occurID~C_HOUR_r+P_AGE_r,AFdrv.boxplot.data,FUN=function(x){length(unique(x))})
 
 # CREDIT: https://stackoverflow.com/questions/26794236/ggplot2-3d-bar-plot
+
 library(latticeExtra)
+
 x11()
 cloud(occurID~C_HOUR_r+P_AGE_r, NAF_agg, panel.3d.cloud=panel.3dbars, col.facet='grey', 
       xbase=0.4, ybase=0.4, scales=list(arrows=FALSE, col=1), 
       par.settings = list(axis.line = list(col = "transparent")),
       zlab='NAF Drivers')
+
 x11()
 cloud(occurID~C_HOUR_r+P_AGE_r, AF_agg, panel.3d.cloud=panel.3dbars, col.facet='grey', 
       xbase=0.4, ybase=0.4, scales=list(arrows=FALSE, col=1), 
       par.settings = list(axis.line = list(col = "transparent")),
       zlab='AF Drivers')
-
 
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 # @@@@@@@@@@@@@@@@@@@@@@ SAND BOX @@@@@@@@@@@@@@@@@@@@@@

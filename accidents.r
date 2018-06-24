@@ -113,7 +113,8 @@ accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
 
 vehType <- c('01','05','06')    #Private passenger, vans, light trucks
 accid$exclude <- (regexpr('U|X',accid$persnID)>0)|                   #Missing time, road condition, injury info, etc
-                 (accid$P_USER=='1' & accid$P_AGE %in% missingVal)  #Missing Age of Driver
+                 (accid$P_ISEV=='N')
+                 |(accid$P_USER=='1' & accid$P_AGE %in% missingVal)  #Missing Age of Driver
                  #|(accid$numVehs!=accid$C_VEHS)                      #Original Veh COunt doesn't match unique num of IDs  
                  #|!(accid$V_TYPE %in% vehType)                        #Vehicle is not priv passenger, van or light truck
 
@@ -153,64 +154,23 @@ View(defitn.tbl.cln)
 # - C_VEHS & C_CONF NOT CONSISTENT!!!
 
 
-
-NAFdrvs <- accid.cln[accid.cln$P_USER=='1'&
-                     accid.cln$P_AGE!='NN'&
-                     as.numeric(accid.cln$V_ID)>1,]
-
-AFdrvs <- accid.cln[accid.cln$P_USER=='1'&
-                    accid.cln$P_AGE!='NN'&
-                    as.numeric(accid.cln$V_ID)==1,]
-
-
-x11()       
-boxplot(as.numeric(NAFdrvs$P_AGE)~NAFdrvs$C_YEAR
-        ,NAFdrvs
-        ,horizontal=TRUE
-        ,main='Age Distribution of NAF Drivers'
-        )
-
-x11()       
-boxplot(as.numeric(AFdrvs$P_AGE)~AFdrvs$C_YEAR
-        ,AFdrvs
-        ,horizontal=TRUE
-        ,main='Age Distribution of AF Drivers'
-        )
-
-# Summary of AF and NAF driver age
-summary(as.numeric(AFdrvs$P_AGE))
-summary(as.numeric(NAFdrvs$P_AGE))
-
 # Build Age Groups
-AFdrvs$P_AGE_r <- cut(as.numeric(AFdrvs$P_AGE),
-                                  breaks = c(0,17,26,36,50,65,99),
-                                  labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
-                                  right=FALSE)
-NAFdrvs$P_AGE_r <- cut(as.numeric(NAFdrvs$P_AGE),
+accid.cln$P_AGE_r <- cut(as.numeric(accid.cln$P_AGE),
                                   breaks = c(0,17,26,36,50,65,99),
                                   labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
                                   right=FALSE)
 # Build Time of Day
-AFdrvs$C_HOUR_r <- cut(as.numeric(AFdrvs$C_HOUR),
+accid.cln$C_HOUR_r <- cut(as.numeric(accid.cln$C_HOUR),
                                   breaks = c(0,5,8,10,12,14,17,19,21,24),
                                   labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
                                              'PM','PM_rush','PM_evening','PM_late'),
                                   right=FALSE)
-NAFdrvs$C_HOUR_r <- cut(as.numeric(NAFdrvs$C_HOUR),
-                                   breaks = c(0,5,8,10,12,14,17,19,21,24),
-                                   labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
-                                              'PM','PM_rush','PM_evening','PM_late'),
-                                   right=FALSE)
 
 # Build Time of week
-AFdrvs$C_WDAY_r <- cut(as.numeric(AFdrvs$C_WDAY),
+accid.cln$C_WDAY_r <- cut(as.numeric(accid.cln$C_WDAY),
                                   breaks = c(1,6,8),
                                   labels = c('wkdy','wknd'),
                                   right=FALSE)
-NAFdrvs$C_WDAY_r <- cut(as.numeric(NAFdrvs$C_WDAY),
-                                   breaks = c(1,6,8),
-                                   labels = c('wkdy','wknd'),
-                                   right=FALSE)
 
 # Build Collision Config
 accid.cln$C_CONF_temp <- accid.cln$C_CONF
@@ -273,7 +233,6 @@ unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
 
 # Build traffic Control
 # 
-
 accid.cln$C_TRAF_temp <- accid.cln$C_TRAF
 accid.cln$C_TRAF_temp <- gsub('QQ','99',accid.cln$C_TRAF_temp)
 accid.cln$C_TRAF_temp <- as.numeric(accid.cln$C_TRAF_temp)
@@ -296,6 +255,92 @@ accid.cln$C_TRAF_r <- as.factor(accid.cln$C_TRAF_r)
 
 
 
+## Another Data Summary Table for cleaned data
+##
+rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
+accid.cln.summ <- data.frame(cbind(fields=colnames(accid.cln)
+                                   ,vals=sapply(accid.cln,function(x){unique(x)})
+                                   ,numNA=sapply(accid.cln,function(x){sum(is.na(x))})
+                                  ))
+
+                                   
+defitn.tbl.cln <- defitn.tbl
+for (i in 1:22){defitn.tbl.cln$values[i] <- unique(accid.cln[i])
+defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
+}
+View(defitn.tbl.cln)
+
+
+
+#Check 100 random records
+View(accid.cln[sample(1:nrow(accid.cln),100),])
+#Count stuff
+aggregate(persnID~P_ISEV+C_YEAR, data=accid.cln, length)
+aggregate(persnID~C_YEAR+C_WDAY_r, data=subset(accid.cln,accid.cln$P_ISEV=='2'), length)
+
+x11()
+mosaicplot(summation, main = 'Proportions')
+
+#Stacked Bar: P_ISEV Freq by year
+x11()
+ggplot() + geom_bar(aes(y = persnID, x = C_YEAR, fill = P_ISEV),
+                        data = aggregate(persnID~C_YEAR+P_ISEV, data=accid.cln, FUN=length),
+                        stat="identity") + coord_flip()
+
+#Stacked Bar: time of day Freq by year+P_ISEV
+x11()
+ggplot() + geom_bar(aes(y = persnID, x = C_YEAR, fill = C_HOUR_r),
+                    data = aggregate(persnID~C_YEAR+C_HOUR_r, data=subset(accid.cln,accid.cln$P_ISEV=='3'), FUN=length),
+                    stat="identity") + coord_flip()
+
+
+
+
+
+
+# [OLD, changed accid$exclude build after.]Check number of records/people with P_ISEV=N,
+# in which collision configs and number of vehicles. Two highest counts 30K+ 
+# were in clear two vehicle collisions. Question this field.
+# 
+aggregate(P_ID~C_CONF_r, data=subset(accid.cln,accid.cln$P_ISEV=='N'), FUN=length)
+#        C_CONF_r C_VEHS  P_ID
+#        ...
+# 7    two_OneDir     02 31126
+# 8  two_multiDir     02 37222
+#        ...
+
+
+
+
+
+# SUBSET OUT DRIVERS
+
+NAFdrvs <- accid.cln[accid.cln$P_USER=='1'&
+                       accid.cln$P_AGE!='NN'&
+                       as.numeric(accid.cln$V_ID)>1,]
+
+AFdrvs <- accid.cln[accid.cln$P_USER=='1'&
+                      accid.cln$P_AGE!='NN'&
+                      as.numeric(accid.cln$V_ID)==1,]
+
+
+x11()       
+boxplot(as.numeric(NAFdrvs$P_AGE)~NAFdrvs$C_YEAR
+        ,NAFdrvs
+        ,horizontal=TRUE
+        ,main='Age Distribution of NAF Drivers'
+)
+
+x11()       
+boxplot(as.numeric(AFdrvs$P_AGE)~AFdrvs$C_YEAR
+        ,AFdrvs
+        ,horizontal=TRUE
+        ,main='Age Distribution of AF Drivers'
+)
+
+# Summary of AF and NAF driver age
+summary(as.numeric(AFdrvs$P_AGE))
+summary(as.numeric(NAFdrvs$P_AGE))
 
 #Check
 #

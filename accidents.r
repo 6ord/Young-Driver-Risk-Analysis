@@ -7,6 +7,8 @@ library(sparklyr)
 
 # install.packages("pdftools")
 library(pdftools)
+# install.packages("arules")
+library(arules)
 library(ggplot2)
 # spark_install(version = "2.1.0")
 # devtools::install_github("rstudio/sparklyr")
@@ -153,6 +155,8 @@ View(defitn.tbl.cln)
 ###########################################################################
 # - C_VEHS & C_CONF NOT CONSISTENT!!!
 
+# Setting P_ISEV as dependent variable, needs to be factor.
+accid.cln$P_ISEV <- as.factor(accid.cln$P_ISEV)
 
 # Build Age Groups
 accid.cln$P_AGE_r <- cut(as.numeric(accid.cln$P_AGE),
@@ -258,18 +262,34 @@ accid.cln$C_TRAF_r <- as.factor(accid.cln$C_TRAF_r)
 ## Another Data Summary Table for cleaned data
 ##
 rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
-accid.cln.summ <- data.frame(cbind(fields=colnames(accid.cln)
-                                   ,vals=sapply(accid.cln,function(x){unique(x)})
-                                   ,numNA=sapply(accid.cln,function(x){sum(is.na(x))})
-                                  ))
 
-                                   
-defitn.tbl.cln <- defitn.tbl
-for (i in 1:22){defitn.tbl.cln$values[i] <- unique(accid.cln[i])
-defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
-}
-View(defitn.tbl.cln)
+# Explore Association
+# 
+expl.fields.r <- colnames(accid.cln[28:33])
+asso.fields.r <- c(expl.fields.r,colnames(accid.cln[20]))
 
+
+fat_rules <- sort(apriori(accid.cln[asso.fields.r],
+                          parameter=list(supp=0.1,conf=0.2,minlen=3),
+                          appearance=list(rhs='P_ISEV=3')),
+                  by='lift')
+
+inj_rules <- sort(apriori(accid.cln[asso.fields.r],
+                          parameter=list(supp=0.1,conf=0.2,minlen=3),
+                          appearance=list(rhs='P_ISEV=2')),
+                  by='lift')
+
+noinj_rules <- sort(apriori(accid.cln[asso.fields.r],
+                            parameter=list(supp=0.1,conf=0.2,minlen=3),
+                            appearance=list(rhs='P_ISEV=1')),
+                    by='lift')
+
+inspect(fat_rules)
+inspect(inj_rules)
+inspect(noinj_rules)
+
+# MAKE SET OF DATA ONLY WITH FATALITIES AND REBUILD RULES
+# 
 
 
 #Check 100 random records

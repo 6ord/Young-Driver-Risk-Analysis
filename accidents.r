@@ -1,40 +1,16 @@
+rm(list=ls())
+
 # install.packages("sparklyr")
-library(sparklyr)
+# library(sparklyr)
 
 # install.packages("data.table")
 # library(data.table)
 # Tried data.table, no noticable difference in run times. Code is simpler though.
 
-# install.packages("pdftools")
-library(pdftools)
-# install.packages("arules")
-library(arules)
-library(ggplot2)
-# spark_install(version = "2.1.0")
-# devtools::install_github("rstudio/sparklyr")
-
-
-# sc <- spark_connect(master = "local")
-# 
-# sp.accid <- spark_read_csv(sc,name = "accid_tbl"
-#                            ,path = "F:/Marsh/canadian-car-accidents-19942014/NCDB_1999_to_2014.csv"
-#                            ,header = TRUE
-#                           #,stringsAsFactors = FALSE
-#                             )
-# select(accid_tbl,C_YEAR)
-
-rm(list=ls())
-
-# IMPORTING DATA
-
 setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
-accid <- #as.data.table(
-  read.csv(".\\canadian-car-accidents-19942014\\NCDB_1999_to_2014.csv"
-           , header = TRUE
-           , stringsAsFactors = FALSE
-  )
-#               )
 
+source('accid_base.r')
+source('accid_range.r')
 
 ###########################################################################
 ##################### Section 1: DATA DICTIONARY ##########################
@@ -85,45 +61,10 @@ sum(subset(accid,accid$P_USER=='1')$P_AGE %in% missingVal)
 ###########################################################################
 #####################  Section 2: DATA CLEANING  ##########################
 ###########################################################################
-
-accid$occurID <- paste(accid$C_YEAR,accid$C_MNTH,accid$C_WDAY,
-                       accid$C_HOUR,'_',accid$C_RCFG,accid$C_WTHR,
-                       accid$C_RSUR,accid$C_RALN,accid$C_TRAF,'_',
-                       accid$C_CONF,accid$C_VEHS,accid$C_SEV,
-                       sep='')
-
-accid$vehicID <- paste(accid$occurID,'_',accid$V_ID,
-                       accid$V_TYPE,accid$V_YEAR,
-                       sep='')
-
-# Save Count of vehIDs within occID to numVehs
-accid$numVehs <- as.character(ave(accid$vehicID,accid$occurID,FUN=function(x)length(unique(x))))
-accid$numVehs <- ifelse(nchar(accid$numVehs)<2,paste('0',accid$numVehs,sep=''),accid$numVehs)
-
 # Original dataset had count of vehicles in accident. Check if above step yielded same
 # vehicle counts.
 nrow(subset(accid,accid$numVehs!=accid$C_VEHS)) #/nrow(accid)
 # 2MM records did not match, out of 5.8MM -  34%
-
-accid$persnID <- paste(accid$vehicID,'_',accid$P_ID,
-                       accid$P_PSN,accid$P_ISEV,
-                       accid$P_SAFE,accid$P_USER,
-                       sep='')
-
-# MISSING if any of above ID contains U|X, --OR-- Age of driver unknown
-# Applicable to Occurences - will remove Occurence if any are TRUE
-
-vehType <- c('01','05','06')    #Private passenger, vans, light trucks
-accid$exclude <- (regexpr('U|X',accid$persnID)>0)|                   #Missing time, road condition, injury info, etc
-                 (accid$P_ISEV=='N')
-                 |(accid$P_USER=='1' & accid$P_AGE %in% missingVal)  #Missing Age of Driver
-                 #|(accid$numVehs!=accid$C_VEHS)                      #Original Veh COunt doesn't match unique num of IDs  
-                 #|!(accid$V_TYPE %in% vehType)                        #Vehicle is not priv passenger, van or light truck
-
-# To Remove entire Occurences if it contains at least 1 record with
-# missing key info ($exclude=TRUE)
-# 
-occurToRemove <- unique(accid$occurID[which(accid$exclude==TRUE)])
 
 # Quick Metrics
 # 
@@ -132,9 +73,6 @@ length(unique(accid$occurID[which(accid$exclude==TRUE)]))/length(unique(accid$oc
 nrow(subset(accid,accid$occurID %in% occurToRemove))/nrow(accid)
 # 67% of all records will be removed
 
-# REMOVE excluded
-# 
-accid.cln <- accid[which(!(accid$occurID %in% occurToRemove)),]
 nrow(accid.cln)
 length(unique(accid.cln$occurID))
 # 1.9MM records
@@ -149,64 +87,9 @@ defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
 }
 View(defitn.tbl.cln)
 
-
 ###########################################################################
 ###################  Section 3: PRELIM DATA TRENDS  #######################
 ###########################################################################
-# - C_VEHS & C_CONF NOT CONSISTENT!!!
-
-# Setting P_ISEV as dependent variable, needs to be factor.
-accid.cln$P_ISEV <- as.factor(accid.cln$P_ISEV)
-
-# Build Age Groups
-accid.cln$P_AGE_r <- cut(as.numeric(accid.cln$P_AGE),
-                                  breaks = c(0,17,26,36,50,65,99),
-                                  labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
-                                  right=FALSE)
-# Build Time of Day
-accid.cln$C_HOUR_r <- cut(as.numeric(accid.cln$C_HOUR),
-                                  breaks = c(0,5,8,10,12,14,17,19,21,24),
-                                  labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
-                                             'PM','PM_rush','PM_evening','PM_late'),
-                                  right=FALSE)
-
-# Build Time of week
-accid.cln$C_WDAY_r <- cut(as.numeric(accid.cln$C_WDAY),
-                                  breaks = c(1,6,8),
-                                  labels = c('wkdy','wknd'),
-                                  right=FALSE)
-
-# Build Collision Config
-accid.cln$C_CONF_temp <- accid.cln$C_CONF
-accid.cln$C_CONF_temp <- gsub('41','00',accid.cln$C_CONF_temp)
-accid.cln$C_CONF_temp <- gsub('QQ','88',accid.cln$C_CONF_temp)
-accid.cln$C_CONF_r <- cut(as.numeric(accid.cln$C_CONF_temp),
-                                   breaks = c(0,3,6,21,31,88,99),
-                                   labels = c('single_colln','single_lctrl','single_othr',
-                                              'two_OneDir','two_multiDir','other'),
-                                   right=FALSE)
-accid.cln$C_CONF_temp <- NULL
-
-
-# Build road Config
-# CREDIT: https://stackoverflow.com/questions/19441092/how-can-i-create-an-infix-between-operator
-# 
-'%bw%'<-function(x,rng) x>=rng[1] & x<=rng[2]
-
-accid.cln$C_RCFG_temp <- accid.cln$C_RCFG
-accid.cln$C_RCFG_temp <- gsub('QQ','99',accid.cln$C_RCFG_temp)
-accid.cln$C_RCFG_temp <- as.numeric(accid.cln$C_RCFG_temp)
-accid.cln$C_RCFG_r <- ''
-
-accid.cln[which(accid.cln$C_RCFG_temp %bw% c(2,3)),]$C_RCFG_r <- 'intersctn'
-accid.cln[which(accid.cln$C_RCFG_temp %bw% c(4,6)|accid.cln$C_RCFG_temp==1),]$C_RCFG_r <- 'city'
-accid.cln[which(accid.cln$C_RCFG_temp==7),]$C_RCFG_r <- 'passLane'
-accid.cln[which(accid.cln$C_RCFG_temp==8),]$C_RCFG_r <- 'ramp'
-accid.cln[which(accid.cln$C_RCFG_temp==9),]$C_RCFG_r <- 'traffCrcle'
-accid.cln[which(accid.cln$C_RCFG_temp %bw% c(10,12)),]$C_RCFG_r <- 'hwy'
-accid.cln[which(accid.cln$C_RCFG_temp==99),]$C_RCFG_r <- 'other'
-accid.cln$C_RCFG_temp <- NULL
-accid.cln$C_RCFG_r <- as.factor(accid.cln$C_RCFG_r)
 
 
 #Weather and Rd Surface redundent? (C_WTHR vs C_RSUR)
@@ -235,39 +118,17 @@ chisq.test(rdVsWthr$road,rdVsWthr$wthr,correct=FALSE)
 unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
 
 
-# Build traffic Control
-# 
-accid.cln$C_TRAF_temp <- accid.cln$C_TRAF
-accid.cln$C_TRAF_temp <- gsub('QQ','99',accid.cln$C_TRAF_temp)
-accid.cln$C_TRAF_temp <- as.numeric(accid.cln$C_TRAF_temp)
-accid.cln$C_TRAF_r <- ''
-
-accid.cln[which(accid.cln$C_TRAF_temp %bw% c(3,6)|
-                accid.cln$C_TRAF_temp %bw% c(9,12)),]$C_TRAF_r <- 'signage'
-accid.cln[which(accid.cln$C_TRAF_temp %bw% c(7,8)),]$C_TRAF_r <- 'person'
-accid.cln[which(accid.cln$C_TRAF_temp %bw% c(13,14)),]$C_TRAF_r <- 'schBus'
-accid.cln[which(accid.cln$C_TRAF_temp %bw% c(15,16)),]$C_TRAF_r <- 'rail'
-accid.cln[which(accid.cln$C_TRAF_temp==18),]$C_TRAF_r <- 'none'
-accid.cln[which(accid.cln$C_TRAF_temp==17|
-                accid.cln$C_TRAF_temp==99),]$C_TRAF_r <- 'other'
-
-accid.cln[which(accid.cln$C_TRAF_temp==1),]$C_TRAF_r <- 'lights_op'
-accid.cln[which(accid.cln$C_TRAF_temp==2),]$C_TRAF_r <- 'lights_np'
-
-accid.cln$C_TRAF_temp <- NULL
-accid.cln$C_TRAF_r <- as.factor(accid.cln$C_TRAF_r)
-
-
 
 ## Another Data Summary Table for cleaned data
 ##
 rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
 
-# Explore Association
-# 
+
+##### Explore Association Rules
+#####
+ 
 expl.fields.r <- colnames(accid.cln[28:33])
 asso.fields.r <- c(expl.fields.r,colnames(accid.cln[20]))
-
 
 fat_rules <- sort(apriori(accid.cln[asso.fields.r],
                           parameter=list(supp=0.1,conf=0.2,minlen=3),
@@ -287,9 +148,12 @@ noinj_rules <- sort(apriori(accid.cln[asso.fields.r],
 inspect(fat_rules)
 inspect(inj_rules)
 inspect(noinj_rules)
+# cleanup
+rm(fat_rules,inj_rules,noinj_rules)
+
 
 # MAKE SET OF DATA ONLY WITH FATALITIES AND REBUILD RULES
-# 
+# CLEAN UP WITH SOME SOURCING
 
 
 #Check 100 random records

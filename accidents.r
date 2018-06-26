@@ -158,12 +158,87 @@ rm(fat_rules,inj_rules,noinj_rules)
 
 #Check 100 random records
 View(accid.cln[sample(1:nrow(accid.cln),100),])
-#Count stuff
-aggregate(persnID~P_ISEV+C_YEAR, data=accid.cln, length)
-aggregate(persnID~C_YEAR+C_WDAY_r, data=subset(accid.cln,accid.cln$P_ISEV=='2'), length)
+
+#Count stuff - By P_ISEV Every Year
+#
+#(old)aggregate(persnID~P_ISEV+C_YEAR, data=accid.cln, length)
+#(old)aggregate(persnID~C_YEAR+C_WDAY_r, data=subset(accid.cln,accid.cln$P_ISEV=='2'), length)
 
 x11()
-mosaicplot(summation, main = 'Proportions')
+barplot(table(accid.cln$P_ISEV,accid.cln$C_YEAR),
+        main='Counts of Not Injured (1), Injured (2) and Fatal (3)',
+        xlab='P_ISEV',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
+        beside=TRUE)
+
+# Deep Dive in Fatal only
+x11()
+barplot(table(x=factor(accid.cln$P_ISEV,exclude=c('1','2')),accid.cln$C_YEAR),
+        main='Counts of Fatal (3)',
+        xlab='P_ISEV=3',
+        ylab='Frequency'
+        #col=rainbow,
+        #legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
+        #beside=TRUE
+        )
+
+#Create Subsets by Injury Level
+#
+accid.cln.fatal <- subset(accid.cln,accid.cln$P_ISEV=='3')
+accid.cln.injrd <- subset(accid.cln,accid.cln$P_ISEV=='2')
+accid.cln.noinj <- subset(accid.cln,accid.cln$P_ISEV=='1')
+# Check
+nrow(accid.cln)==sum(nrow(accid.cln.fatal),
+                     nrow(accid.cln.injrd),
+                     nrow(accid.cln.noinj)
+                    )
+
+# Fatal Injuries by Rd Config
+x11()
+barplot(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR),
+        main='Fatal Injuries by Rd Config',
+        xlab='Fatal',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR)),
+        beside=TRUE)
+
+# Injuries by Rd Config
+x11()
+barplot(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR),
+        main='Injuries by Rd Config',
+        xlab='Injured',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
+
+
+# Fatal Injuries by Traffic Control
+x11()
+barplot(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR),
+        main='Fatal Injuries by Traffic Control',
+        xlab='Fatal',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR)),
+        beside=TRUE)
+
+# Injuries by Traffic Control
+x11()
+barplot(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR),
+        main='Injuries by Traffic Control',
+        xlab='Injured',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
+
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @@@@@ ORDER FACTORS - Review all the _r's @@@@@@
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 #Stacked Bar: P_ISEV Freq by year
 x11()

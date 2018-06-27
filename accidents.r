@@ -112,11 +112,12 @@ chisq.test(rdVsWthr$road,rdVsWthr$wthr,correct=FALSE)
 # 
 # small p-value, fail to reject H0 that rd and wthr
 # are independent. They are dependent of one another.
-# Manual review below reveal anything goes! Road can
+# Manual review below reveal anything goes. Road can
 # be dry when it's raining or snowing! Only trend is
 # it's not snowing or icy when road is flooded.
 unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
 
+rm(rdVsWthr)
 
 
 ## Another Data Summary Table for cleaned data
@@ -164,6 +165,7 @@ View(accid.cln[sample(1:nrow(accid.cln),100),])
 #(old)aggregate(persnID~P_ISEV+C_YEAR, data=accid.cln, length)
 #(old)aggregate(persnID~C_YEAR+C_WDAY_r, data=subset(accid.cln,accid.cln$P_ISEV=='2'), length)
 
+#P_ISEV Comparison
 x11()
 barplot(table(accid.cln$P_ISEV,accid.cln$C_YEAR),
         main='Counts of Not Injured (1), Injured (2) and Fatal (3)',
@@ -194,6 +196,26 @@ nrow(accid.cln)==sum(nrow(accid.cln.fatal),
                      nrow(accid.cln.injrd),
                      nrow(accid.cln.noinj)
                     )
+
+# Fatal Injuries by Time
+x11()
+barplot(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r),
+        main='Fatal Injuries by Time',
+        xlab='Fatal',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r)),
+        beside=TRUE)
+
+# Injuries by Time
+x11()
+barplot(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r),
+        main='Injuries by Time',
+        xlab='Injured',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r)),
+        beside=TRUE)
 
 # Fatal Injuries by Rd Config
 x11()
@@ -236,8 +258,30 @@ barplot(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR),
         legend=rownames(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR)),
         beside=TRUE)
 
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# @@@@@ ORDER FACTORS - Review all the _r's @@@@@@
+# Fatal Injuries by Collision Config
+x11()
+barplot(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR),
+        main='Fatal Injuries by Collision Config',
+        xlab='Fatal',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR)),
+        beside=TRUE)
+
+# Injuries by Collision Config
+x11()
+barplot(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR),
+        main='Injuries by Collision Config',
+        xlab='Injured',
+        ylab='Frequency',
+        #col=rainbow,
+        legend=rownames(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
+
+
+
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @@@@@ COLORS, FRIDAY, COUNT ACCID(not ppl) @@@@@@@
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 #Stacked Bar: P_ISEV Freq by year

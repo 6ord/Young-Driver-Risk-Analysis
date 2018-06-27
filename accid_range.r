@@ -18,6 +18,8 @@ accid.cln$C_HOUR_r <- cut(as.numeric(accid.cln$C_HOUR),
                           labels = c('overnight','AM_early','AM_rush','AM_late','mid_day',
                                      'PM','PM_rush','PM_evening','PM_late'),
                           right=FALSE)
+accid.cln$C_HOUR_r <- factor(accid.cln$C_HOUR_r,levels = c('AM_early','AM_rush','AM_late','mid_day','PM',
+                                                           'PM_rush','PM_evening','PM_late','overnight'))
 
 # Build Time of week
 accid.cln$C_WDAY_r <- cut(as.numeric(accid.cln$C_WDAY),
@@ -35,7 +37,8 @@ accid.cln$C_CONF_r <- cut(as.numeric(accid.cln$C_CONF_temp),
                                      'two_OneDir','two_multiDir','other'),
                           right=FALSE)
 accid.cln$C_CONF_temp <- NULL
-
+accid.cln$C_CONF_r <- factor(accid.cln$C_CONF_r, levels=c('single_colln','single_lctrl','single_othr',
+                                                          'two_OneDir','two_multiDir','other'))
 
 # Build road Config
 # CREDIT: https://stackoverflow.com/questions/19441092/how-can-i-create-an-infix-between-operator
@@ -55,7 +58,8 @@ accid.cln[which(accid.cln$C_RCFG_temp==9),]$C_RCFG_r <- 'traffCrcle'
 accid.cln[which(accid.cln$C_RCFG_temp %bw% c(10,12)),]$C_RCFG_r <- 'hwy'
 accid.cln[which(accid.cln$C_RCFG_temp==99),]$C_RCFG_r <- 'other'
 accid.cln$C_RCFG_temp <- NULL
-accid.cln$C_RCFG_r <- as.factor(accid.cln$C_RCFG_r)
+accid.cln$C_RCFG_r <- factor(accid.cln$C_RCFG_r, levels=c('hwy','passLane','city','intersctn',
+                                                          'ramp','traffCrcle','other'))
 
 # Build traffic Control
 # 
@@ -72,12 +76,12 @@ accid.cln[which(accid.cln$C_TRAF_temp %bw% c(15,16)),]$C_TRAF_r <- 'rail'
 accid.cln[which(accid.cln$C_TRAF_temp==18),]$C_TRAF_r <- 'none'
 accid.cln[which(accid.cln$C_TRAF_temp==17|
                   accid.cln$C_TRAF_temp==99),]$C_TRAF_r <- 'other'
-
 accid.cln[which(accid.cln$C_TRAF_temp==1),]$C_TRAF_r <- 'lights_op'
 accid.cln[which(accid.cln$C_TRAF_temp==2),]$C_TRAF_r <- 'lights_np'
 
 accid.cln$C_TRAF_temp <- NULL
-accid.cln$C_TRAF_r <- as.factor(accid.cln$C_TRAF_r)
+accid.cln$C_TRAF_r <- factor(accid.cln$C_TRAF_r, levels=c('lights_op','lights_np','signage','schBus','rail',
+                                                          'person','none','other'))
 
 
 

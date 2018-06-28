@@ -8,9 +8,14 @@ rm(list=ls())
 # Tried data.table, no noticable difference in run times. Code is simpler though.
 
 setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
+source('accid_base.r') #packages, importing, build occur, veh and person IDs
+source('accid_range.r') #build bands/ranges for age, time of day, time of week, rd/crash config, etc
 
-source('accid_base.r')
-source('accid_range.r')
+#####
+##### In Development Phase, skip to "Section 3: PRELIM DATA TRENDS" (~line 95)
+
+
+
 
 ###########################################################################
 ##################### Section 1: DATA DICTIONARY ##########################
@@ -98,7 +103,6 @@ rdVsWthr <- as.data.frame(cbind(road=accid.cln$C_RSUR,
                                 wthr=accid.cln$C_WTHR))
 #group some roads so have same length as wther
 rdVsWthr[which(rdVsWthr$road %in% c('7','8')),]$road <- '6'
-
 rdVsWthr$road = factor(rdVsWthr$road,
                        levels=c('1','2','3',
                                 '4','5','6',
@@ -119,11 +123,9 @@ unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
 
 rm(rdVsWthr)
 
-
 ## Another Data Summary Table for cleaned data
 ##
 rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
-
 
 ##### Explore Association Rules
 #####
@@ -171,7 +173,7 @@ barplot(table(accid.cln$P_ISEV,accid.cln$C_YEAR),
         main='Counts of Not Injured (1), Injured (2) and Fatal (3)',
         xlab='P_ISEV',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(3),
         legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
         beside=TRUE)
 
@@ -180,8 +182,8 @@ x11()
 barplot(table(x=factor(accid.cln$P_ISEV,exclude=c('1','2')),accid.cln$C_YEAR),
         main='Counts of Fatal (3)',
         xlab='P_ISEV=3',
-        ylab='Frequency'
-        #col=rainbow,
+        ylab='Frequency',
+        col=cm.colors(1)
         #legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
         #beside=TRUE
         )
@@ -203,7 +205,7 @@ barplot(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r),
         main='Fatal Injuries by Time',
         xlab='Fatal',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.fatal$C_HOUR_r))),
         legend=rownames(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r)),
         beside=TRUE)
 
@@ -213,9 +215,41 @@ barplot(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r),
         main='Injuries by Time',
         xlab='Injured',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.injrd$C_HOUR_r))),
         legend=rownames(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r)),
         beside=TRUE)
+
+
+
+#What if we count Friday night as weekend, and Sunday night as weekday??
+#
+fields.friday.r <- c(colnames(accid.cln[3]),expl.fields.r,colnames(accid.cln[20]))
+temp.accid <- accid.cln[fields.friday.r]
+
+temp.accid.fatal <- subset(accid.cln,accid.cln$P_ISEV=='3')
+temp.accid.injrd <- subset(accid.cln,accid.cln$P_ISEV=='2')
+temp.accid.noinj <- subset(accid.cln,accid.cln$P_ISEV=='1')
+
+# Fatal Injuries
+x11()
+barplot(table(temp.accid.fatal$C_HOUR_r,temp.accid.fatal$C_WDAY),
+        main='Fatal Injuries by Day (Mon-Sun)',
+        xlab='Fatal',
+        ylab='Frequency',
+        col=rainbow(length(unique(temp.accid.fatal$C_HOUR_r))),
+        legend=rownames(table(temp.accid.fatal$C_HOUR_r,temp.accid.fatal$C_WDAY)),
+        beside=TRUE)
+# Injuries
+x11()
+barplot(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY),
+        main='Injuries by Day (Mon-Sun)',
+        xlab='Injured',
+        ylab='Frequency',
+        col=rainbow(length(unique(temp.accid.injrd$C_HOUR_r))),
+        legend=rownames(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY)),
+        beside=TRUE)
+#Friday night/overnight indeed has a lot. Surprisingly, Sunday overnight was high too.
+rm(temp.accid,temp.accid.fatal,temp.accid.injrd,temp.accid.noinj)
 
 # Fatal Injuries by Rd Config
 x11()
@@ -223,7 +257,8 @@ barplot(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Rd Config',
         xlab='Fatal',
         ylab='Frequency',
-        #col=rainbow,
+        #col=rainbow(length(unique(accid.cln.fatal$C_RCFG_r))),
+        col=rainbow(7),
         legend=rownames(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
 
@@ -233,7 +268,7 @@ barplot(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Rd Config',
         xlab='Injured',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.injrd$C_RCFG_r))),
         legend=rownames(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR)),
         beside=TRUE)
 
@@ -244,7 +279,7 @@ barplot(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Traffic Control',
         xlab='Fatal',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.fatal$C_TRAF_r))),
         legend=rownames(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
 
@@ -254,7 +289,7 @@ barplot(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Traffic Control',
         xlab='Injured',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.injrd$C_TRAF_r))),
         legend=rownames(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR)),
         beside=TRUE)
 
@@ -264,7 +299,7 @@ barplot(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Collision Config',
         xlab='Fatal',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.fatal$C_CONF_r))),
         legend=rownames(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
 
@@ -274,15 +309,54 @@ barplot(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Collision Config',
         xlab='Injured',
         ylab='Frequency',
-        #col=rainbow,
+        col=rainbow(length(unique(accid.cln.injrd$C_CONF_r))),
         legend=rownames(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR)),
         beside=TRUE)
 
+#Why are there so many single car collision records in 1999???
+#
+accid.occur.fields <- c(colnames(accid.cln[1]),colnames(accid.cln[23]),expl.fields.r,colnames(accid.cln[20]))
+temp.accid <- accid.cln[accid.occur.fields]
+temp.accid.uniq <- temp.accid[which(!duplicated(temp.accid$occurID)),]
+rm(accid.occur.fields,temp.accid)
+#Check num records
+length(unique(accid.cln$occurID))==nrow(temp.accid.uniq)
+
+x11()
+barplot(table(temp.accid.uniq$C_CONF_r,temp.accid.uniq$C_YEAR),
+        main='Collisions by Collision Config',
+        xlab='All Collisions',
+        ylab='Frequency',
+        col=rainbow(length(unique(temp.accid.uniq$C_CONF_r))),
+        legend=rownames(table(temp.accid.uniq$C_CONF_r,temp.accid.uniq$C_YEAR)),
+        beside=TRUE)
+#Still high in 1999. But noticed Single Other was very low - could be recoding from
+#Single Other to Single Collision.
+
+#Explore Driver Age
+#
+driver.fields <- c(colnames(accid.cln[1]),colnames(accid.cln[22]),
+                   colnames(accid.cln[24]),expl.fields.r,colnames(accid.cln[20]))
+accid.drvs <- accid.cln[driver.fields]
 
 
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# @@@@@ COLORS, FRIDAY, COUNT ACCID(not ppl) @@@@@@@
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+#temp.accid.uniq <- temp.accid[which(!duplicated(temp.accid$occurID)),]
+
+rm(driver.fields)
+length(unique(accid.drvs$vehicID))
+
+drvCounts <- data.frame(vehID=unique(accid.drvs$vehicID))
+drvCounts$numDrvs <- 0
+for (i in length(drvCounts$vehID)){
+  drvCounts$numDrvs[i] <- nrow(subset(accid.drvs,((accid.drvs$vehicID==drvCounts$vehID[i])&(accid.drvs$P_USER=='1'))))
+  }
+View(head(drvCounts))
+rm(drvCounts)
+
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# @@@@@ @@@@@@@@@@@@@@@@@@@@ LINE 346 drivers by age @@@@@@@
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 #Stacked Bar: P_ISEV Freq by year
 x11()

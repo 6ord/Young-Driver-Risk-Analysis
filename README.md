@@ -19,3 +19,24 @@ Conceptual use of this data can be found here (https://prezi.com/view/LquWzGw3HZ
 
 The sheer size of this dataset will require the use of a Hadoop cluster (Hive, Pig, Spark) to conduct the data discovery phase efficiently. After that, I’d like to attempt using Bayesian Inference to investigate whether there’s a causal relationship between gender, age and fatality. There’s also an opportunity to look at yearly trends, and/or validate common reasoning for high insurance prices for young drivers.
 
+# About the R Scripts:
+
+accid_base.r
+- Imports original dataset
+- Imports 3rd party libraries
+- Builds user defined attributes
+- Addresses missing values
+
+accid_range.r
+- Band age into age groups
+- Band collision Hour into times of day, weekday/weekend
+- Map/categorize collision configuration
+- Map/categorize road configuration
+- Map/categorize traffic signal type
+
+accidents.r
+- Build data summary within R
+- Build vehicle driver age attribute (to be moved to accid_base.r)
+- Frequency plots by injury level
+- Frequency plots by driver age group
+- Association Rules

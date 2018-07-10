@@ -52,13 +52,15 @@ accid.cln$C_RCFG_r <- ''
 
 accid.cln[which(accid.cln$C_RCFG_temp %bw% c(2,3)),]$C_RCFG_r <- 'intersctn'
 accid.cln[which(accid.cln$C_RCFG_temp %bw% c(4,6)|accid.cln$C_RCFG_temp==1),]$C_RCFG_r <- 'city'
-accid.cln[which(accid.cln$C_RCFG_temp==7),]$C_RCFG_r <- 'passLane'
+#accid.cln[which(accid.cln$C_RCFG_temp==7),]$C_RCFG_r <- 'passLane'
 accid.cln[which(accid.cln$C_RCFG_temp==8),]$C_RCFG_r <- 'ramp'
 accid.cln[which(accid.cln$C_RCFG_temp==9),]$C_RCFG_r <- 'traffCrcle'
-accid.cln[which(accid.cln$C_RCFG_temp %bw% c(10,12)),]$C_RCFG_r <- 'hwy'
+accid.cln[which(accid.cln$C_RCFG_temp %bw% c(10,12)|accid.cln$C_RCFG_temp==7),]$C_RCFG_r <- 'hwy'
 accid.cln[which(accid.cln$C_RCFG_temp==99),]$C_RCFG_r <- 'other'
 accid.cln$C_RCFG_temp <- NULL
-accid.cln$C_RCFG_r <- factor(accid.cln$C_RCFG_r, levels=c('hwy','passLane','city','intersctn',
+# accid.cln$C_RCFG_r <- factor(accid.cln$C_RCFG_r, levels=c('hwy','passLane','city','intersctn',
+#                                                           'ramp','traffCrcle','other'))
+accid.cln$C_RCFG_r <- factor(accid.cln$C_RCFG_r, levels=c('hwy','city','intersctn',
                                                           'ramp','traffCrcle','other'))
 
 # Build traffic Control

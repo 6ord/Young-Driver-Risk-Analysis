@@ -7,15 +7,16 @@ rm(list=ls())
 # library(data.table)
 # Tried data.table, no noticable difference in run times. Code is simpler though.
 
-setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
+# setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
+setwd('C:\\Users\\trunk\\Downloads\\BigData\\repository')
+
 source('accid_base.r') #packages, importing, build occur, veh and person IDs
 source('accid_range.r') #build bands/ranges for age, time of day, time of week, rd/crash config, etc
 
-#####
-##### In Development Phase, skip to "Section 3: PRELIM DATA TRENDS" (~line 95)
+#Check 100 random records
+#View(accid.cln[sample(1:nrow(accid.cln),100),])
 
-
-
+# SKip to line 100
 
 ###########################################################################
 ##################### Section 1: DATA DICTIONARY ##########################
@@ -92,10 +93,95 @@ defitn.tbl.cln$numNA[i] <- sum(accid.cln[,i] %in% missingVal)
 }
 View(defitn.tbl.cln)
 
+## Another Data Summary Table for cleaned data
+##
+rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
+
 ###########################################################################
 ###################  Section 3: PRELIM DATA TRENDS  #######################
 ###########################################################################
 
+#Important for Association Rules Section around line 380
+expl.fields.r <- colnames(accid.cln[28:33])
+asso.fields.r <- c(expl.fields.r,colnames(accid.cln[20]))
+
+# Passenger / Driver Linkage
+# Building DRV_AGE:
+# - Build temporary dataframe of unique vehicle IDs and its driver's age ('accid.drvs'),
+#   remove vehicle IDs where there were multiple drivers (remove data anomalies), then
+#   lastly, merge accid.drvs with original cleaned dataset.
+#   
+driver.fields <- c(colnames(accid.cln[1]),colnames(accid.cln[22]),colnames(accid.cln[24]),
+                   colnames(accid.cln[18]),expl.fields.r,colnames(accid.cln[20]))
+accid.drvs <- accid.cln[accid.cln$P_USER=='1'& accid.cln$P_AGE!='NN',] #filtered out 980,667 records (to 1,737,594)
+# > nrow(subset(accid.cln,accid.cln$P_USER!='1'))
+# [1] 980652
+# > nrow(subset(accid.cln,accid.cln$P_USER=='1'&accid.cln$P_AGE=='NN'))
+# [1] 15
+# 980,652 drivers, 15 of them did not have age captured.
+# 
+accid.drvs <- accid.drvs[driver.fields]
+accid.drvs$P_AGE <-as.numeric(accid.drvs$P_AGE) 
+#Expect as many drivers as vehicle IDs (one driver per vehicle)
+#Remove vehicle IDs where there's more than 1 driver. In other words,
+#remove drivers with common vehicleID
+tempTab <- table(accid.drvs$vehicID)
+accid.drvs <- accid.drvs[which(!accid.drvs$vehicID %in% data.frame(tempTab[tempTab>1])[,1]),]
+nrow(accid.drvs)-1737594 #from line 336
+
+rm(tempTab)
+
+#Check
+nrow(accid.drvs)==length(unique(accid.drvs$vehicID))
+nrow(accid.drvs)==sum(as.numeric(accid.drvs$P_USER))
+
+accid.cln.wDrvAge <- merge(accid.drvs[c('vehicID','P_AGE','P_AGE_r')],accid.cln,by='vehicID', all.y=TRUE)
+# > length(unique(accid.cln$vehicID))
+# [1] 1853318
+# > length(unique(accid.cln.wDrvAge$vehicID))
+# [1] 1853318
+# 
+# Tidy column names
+newFields <- colnames(accid.cln.wDrvAge)
+newFields[2:3] <- c('DRV_AGE','DRV_AGE_r')
+newFields[21] <- c('P_AGE')
+newFields[30] <- c('P_AGE_r')
+colnames(accid.cln.wDrvAge) <- newFields
+
+# Left Join from line 356 yielded 202,111 of 2.7MM records with NULL
+# DRV_AGE. (There was no driver age found)
+# 
+# > sum(is.na(accid.cln.wDrvAge$DRV_AGE))
+# [1] 202111
+# > sum(!is.na(accid.cln.wDrvAge$DRV_AGE))
+# [1] 2516150
+# 
+# Removing them:
+accid.cln.wDrvAge <- accid.cln.wDrvAge[which(!is.na(accid.cln.wDrvAge$DRV_AGE)),]
+
+# Test Review some records
+rm(driver.fields,accid.drvs
+   #,accid.cln
+   )
+length(unique(accid.cln.wDrvAge$vehicID))
+#View(accid.cln.wDrvAge[sample(1:nrow(accid.cln.wDrvAge),100),])
+
+# Randomly take 10 sequential Vehicle ID records to examine. Ensure driver age
+# was captured on passenger records.
+uniqueVehIDs <- unique(accid.cln.wDrvAge$vehicID)
+raNum <- sample(11:length(uniqueVehIDs)-11,1)
+sampleVehID <- uniqueVehIDs[(raNum-10):raNum]
+rm(uniqueVehIDs,raNum)
+#View(sampleVehID) #Random 10 consequtive Vehicle IDs
+View(subset(accid.cln.wDrvAge,accid.cln.wDrvAge$vehicID==sampleVehID[2])[c('vehicID','P_USER',
+                                                                           'P_AGE','DRV_AGE',
+                                                                           'DRV_AGE_r')])
+
+###################################
+####### Frequency Plots ###########
+####### -By Injury Line 207 #######
+####### -By driverAge Line 379 ####
+###################################
 
 #Weather and Rd Surface redundent? (C_WTHR vs C_RSUR)
 #
@@ -103,10 +189,10 @@ rdVsWthr <- as.data.frame(cbind(road=accid.cln$C_RSUR,
                                 wthr=accid.cln$C_WTHR))
 #group some roads so have same length as wther
 rdVsWthr[which(rdVsWthr$road %in% c('7','8')),]$road <- '6'
-rdVsWthr$road = factor(rdVsWthr$road,
-                       levels=c('1','2','3',
-                                '4','5','6',
-                                '9','Q'))
+rdVsWthr$road <- factor(rdVsWthr$road,
+                        levels=c('1','2','3',
+                                 '4','5','6',
+                                 '9','Q'))
 chisq.test(rdVsWthr$road,rdVsWthr$wthr,correct=FALSE)
 # Pearson's Chi-squared test
 # 
@@ -120,55 +206,18 @@ chisq.test(rdVsWthr$road,rdVsWthr$wthr,correct=FALSE)
 # be dry when it's raining or snowing! Only trend is
 # it's not snowing or icy when road is flooded.
 unique(subset(rdVsWthr,rdVsWthr$road=='9')$wthr)
-
 rm(rdVsWthr)
 
-## Another Data Summary Table for cleaned data
-##
-rm(defitn.tbl,defitn.tbl.cln,dataDictionary,i)
-
-##### Explore Association Rules
-#####
- 
-expl.fields.r <- colnames(accid.cln[28:33])
-asso.fields.r <- c(expl.fields.r,colnames(accid.cln[20]))
-
-fat_rules <- sort(apriori(accid.cln[asso.fields.r],
-                          parameter=list(supp=0.1,conf=0.2,minlen=3),
-                          appearance=list(rhs='P_ISEV=3')),
-                  by='lift')
-
-inj_rules <- sort(apriori(accid.cln[asso.fields.r],
-                          parameter=list(supp=0.1,conf=0.2,minlen=3),
-                          appearance=list(rhs='P_ISEV=2')),
-                  by='lift')
-
-noinj_rules <- sort(apriori(accid.cln[asso.fields.r],
-                            parameter=list(supp=0.1,conf=0.2,minlen=3),
-                            appearance=list(rhs='P_ISEV=1')),
-                    by='lift')
-
-inspect(fat_rules)
-inspect(inj_rules)
-inspect(noinj_rules)
-# cleanup
-rm(fat_rules,inj_rules,noinj_rules)
-
-
-# MAKE SET OF DATA ONLY WITH FATALITIES AND REBUILD RULES
-# CLEAN UP WITH SOME SOURCING
-
-
-#Check 100 random records
-View(accid.cln[sample(1:nrow(accid.cln),100),])
-
-#Count stuff - By P_ISEV Every Year
+##############################################
+####### Frequency Plots: All by Injury #######
+##############################################
 #
 #(old)aggregate(persnID~P_ISEV+C_YEAR, data=accid.cln, length)
 #(old)aggregate(persnID~C_YEAR+C_WDAY_r, data=subset(accid.cln,accid.cln$P_ISEV=='2'), length)
 
 #P_ISEV Comparison
 x11()
+par(mfrow=c(1,2))
 barplot(table(accid.cln$P_ISEV,accid.cln$C_YEAR),
         main='Counts of Not Injured (1), Injured (2) and Fatal (3)',
         xlab='P_ISEV',
@@ -176,17 +225,16 @@ barplot(table(accid.cln$P_ISEV,accid.cln$C_YEAR),
         col=rainbow(3),
         legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
         beside=TRUE)
-
 # Deep Dive in Fatal only
-x11()
+# x11()
 barplot(table(x=factor(accid.cln$P_ISEV,exclude=c('1','2')),accid.cln$C_YEAR),
         main='Counts of Fatal (3)',
         xlab='P_ISEV=3',
         ylab='Frequency',
-        col=cm.colors(1)
+        col='blue'
         #legend=rownames(table(accid.cln$P_ISEV,accid.cln$C_YEAR)),
         #beside=TRUE
-        )
+)
 
 #Create Subsets by Injury Level
 #
@@ -197,20 +245,20 @@ accid.cln.noinj <- subset(accid.cln,accid.cln$P_ISEV=='1')
 nrow(accid.cln)==sum(nrow(accid.cln.fatal),
                      nrow(accid.cln.injrd),
                      nrow(accid.cln.noinj)
-                    )
+)
 
 # Fatal Injuries by Time
 x11()
+par(mfrow=c(1,3))
 barplot(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r),
         main='Fatal Injuries by Time',
         xlab='Fatal',
         ylab='Frequency',
         col=rainbow(length(unique(accid.cln.fatal$C_HOUR_r))),
-        legend=rownames(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r)),
+        #legend=rownames(table(accid.cln.fatal$C_HOUR_r,accid.cln.fatal$C_WDAY_r)),
         beside=TRUE)
-
 # Injuries by Time
-x11()
+# x11()
 barplot(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r),
         main='Injuries by Time',
         xlab='Injured',
@@ -218,8 +266,13 @@ barplot(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r),
         col=rainbow(length(unique(accid.cln.injrd$C_HOUR_r))),
         legend=rownames(table(accid.cln.injrd$C_HOUR_r,accid.cln.injrd$C_WDAY_r)),
         beside=TRUE)
-
-
+barplot(table(accid.cln.noinj$C_HOUR_r,accid.cln.noinj$C_WDAY_r),
+        main='No Injuries by Time',
+        xlab='Not Injured',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.noinj$C_HOUR_r))),
+        legend=rownames(table(accid.cln.noinj$C_HOUR_r,accid.cln.noinj$C_WDAY_r)),
+        beside=TRUE)
 
 #What if we count Friday night as weekend, and Sunday night as weekday??
 #
@@ -249,10 +302,11 @@ barplot(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY),
         legend=rownames(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY)),
         beside=TRUE)
 #Friday night/overnight indeed has a lot. Surprisingly, Sunday overnight was high too.
-rm(temp.accid,temp.accid.fatal,temp.accid.injrd,temp.accid.noinj)
+rm(temp.accid,temp.accid.fatal,temp.accid.injrd,temp.accid.noinj, fields.friday.r)
 
 # Fatal Injuries by Rd Config
 x11()
+par(mfrow=c(1,3))
 barplot(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Rd Config',
         xlab='Fatal',
@@ -261,20 +315,27 @@ barplot(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR),
         col=rainbow(7),
         legend=rownames(table(accid.cln.fatal$C_RCFG_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
-
 # Injuries by Rd Config
-x11()
+# x11()
 barplot(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Rd Config',
         xlab='Injured',
         ylab='Frequency',
-        col=rainbow(length(unique(accid.cln.injrd$C_RCFG_r))),
+        col=rainbow(7),
         legend=rownames(table(accid.cln.injrd$C_RCFG_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
+barplot(table(accid.cln.noinj$C_RCFG_r,accid.cln.noinj$C_YEAR),
+        main='No Injuries by Rd Config',
+        xlab='Not Injured',
+        ylab='Frequency',
+        col=rainbow(7),
+        legend=rownames(table(accid.cln.noinj$C_RCFG_r,accid.cln.noinj$C_YEAR)),
         beside=TRUE)
 
 
 # Fatal Injuries by Traffic Control
 x11()
+par(mfrow=c(1,3))
 barplot(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Traffic Control',
         xlab='Fatal',
@@ -282,9 +343,8 @@ barplot(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR),
         col=rainbow(length(unique(accid.cln.fatal$C_TRAF_r))),
         legend=rownames(table(accid.cln.fatal$C_TRAF_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
-
 # Injuries by Traffic Control
-x11()
+# x11()
 barplot(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Traffic Control',
         xlab='Injured',
@@ -292,9 +352,17 @@ barplot(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR),
         col=rainbow(length(unique(accid.cln.injrd$C_TRAF_r))),
         legend=rownames(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR)),
         beside=TRUE)
+barplot(table(accid.cln.noinj$C_TRAF_r,accid.cln.noinj$C_YEAR),
+        main='No Injuries by Traffic Control',
+        xlab='Not Injured',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.noinj$C_TRAF_r))),
+        # legend=rownames(table(accid.cln.injrd$C_TRAF_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
 
 # Fatal Injuries by Collision Config
 x11()
+par(mfrow=c(1,3))
 barplot(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR),
         main='Fatal Injuries by Collision Config',
         xlab='Fatal',
@@ -302,15 +370,21 @@ barplot(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR),
         col=rainbow(length(unique(accid.cln.fatal$C_CONF_r))),
         legend=rownames(table(accid.cln.fatal$C_CONF_r,accid.cln.fatal$C_YEAR)),
         beside=TRUE)
-
 # Injuries by Collision Config
-x11()
+# x11()
 barplot(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR),
         main='Injuries by Collision Config',
         xlab='Injured',
         ylab='Frequency',
         col=rainbow(length(unique(accid.cln.injrd$C_CONF_r))),
         legend=rownames(table(accid.cln.injrd$C_CONF_r,accid.cln.injrd$C_YEAR)),
+        beside=TRUE)
+barplot(table(accid.cln.noinj$C_CONF_r,accid.cln.noinj$C_YEAR),
+        main='No Injuries by Collision Config',
+        xlab='Not Injured',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.noinj$C_CONF_r))),
+        legend=rownames(table(accid.cln.noinj$C_CONF_r,accid.cln.noinj$C_YEAR)),
         beside=TRUE)
 
 #Why are there so many single car collision records in 1999???
@@ -330,33 +404,231 @@ barplot(table(temp.accid.uniq$C_CONF_r,temp.accid.uniq$C_YEAR),
         col=rainbow(length(unique(temp.accid.uniq$C_CONF_r))),
         legend=rownames(table(temp.accid.uniq$C_CONF_r,temp.accid.uniq$C_YEAR)),
         beside=TRUE)
-#Still high in 1999. But noticed Single Other was very low - could be recoding from
-#Single Other to Single Collision.
+#Still high in 1999. But noticed Single Other was very low - suspect recoding from
+#Single Other to Single Collision after 1999
+rm(temp.accid.uniq)
 
-#Explore Driver Age
+rm(accid.cln.fatal,
+   accid.cln.injrd,
+   accid.cln.noinj
+  )
+
+#################################################
+####### Frequency Plots: All by DriverAge #######
+#################################################
+
+#High Level DrvAge Comparison
+zoom17To49 <- subset(accid.cln.wDrvAge,accid.cln.wDrvAge$DRV_AGE %bw% c(17,49))
+
+x11()
+par(mfrow=c(2,1))
+barplot(table(accid.cln.wDrvAge$DRV_AGE_r,accid.cln.wDrvAge$C_YEAR),
+        main='Counts of Colliding Vehicle Occupants',
+        xlab='Driver Age',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.wDrvAge$DRV_AGE_r))),
+        col=rainbow(6),
+        legend=rownames(table(accid.cln.wDrvAge$DRV_AGE_r,accid.cln.wDrvAge$C_YEAR)),
+        beside=TRUE)
+# Zoom in between 17-49
+# zoom17To49 <- subset(accid.cln.wDrvAge,accid.cln.wDrvAge$DRV_AGE %bw% c(17,49))
+# x11()
+barplot(table(zoom17To49$DRV_AGE,zoom17To49$C_YEAR),
+        main='Counts of Colliding Vehicle Occupants',
+        xlab='DRV_AGE (17-49)',
+        ylab='Frequency',
+        col='blue',
+        #legend=rownames(table(accid.cln.wDrvAge$DRV_AGE_r,accid.cln.wDrvAge$C_YEAR)),
+        border=NA,
+        beside=TRUE)
+
+rm(zoom17To49)
+
+#Create Subsets by Age Group
 #
-driver.fields <- c(colnames(accid.cln[1]),colnames(accid.cln[22]),
-                   colnames(accid.cln[24]),expl.fields.r,colnames(accid.cln[20]))
-accid.drvs <- accid.cln[driver.fields]
+accid.cln.17 <- subset(accid.cln.wDrvAge,accid.cln.wDrvAge$DRV_AGE_r=='17-25')
+accid.cln.26 <- subset(accid.cln.wDrvAge,accid.cln.wDrvAge$DRV_AGE_r=='26-35')
+accid.cln.36 <- subset(accid.cln.wDrvAge,accid.cln.wDrvAge$DRV_AGE_r=='36-49')
+
+# Occupants by 3 top age groups by Time
+x11()
+par(mfrow=c(3,1))
+barplot(table(accid.cln.17$C_HOUR_r,accid.cln.17$C_WDAY_r),
+        main='Occupants by Time',
+        xlab='Drv Age 17-25',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.17$C_HOUR_r))),
+        legend=rownames(table(accid.cln.17$C_HOUR_r,accid.cln.17$C_WDAY_r)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.26$C_HOUR_r,accid.cln.26$C_WDAY_r),
+        main='Occupants by Time',
+        xlab='Drv Age 26-35',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.26$C_HOUR_r))),
+        #legend=rownames(table(accid.cln.26$C_HOUR_r,accid.cln.26$C_WDAY_r)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.36$C_HOUR_r,accid.cln.36$C_WDAY_r),
+        main='Occupants by Time',
+        xlab='Drv Age 36-49',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.36$C_HOUR_r))),
+        #legend=rownames(table(accid.cln.36$C_HOUR_r,accid.cln.36$C_WDAY_r)),
+        beside=TRUE)
+# 
+# #What if we count Friday night as weekend, and Sunday night as weekday??
+# #
+# fields.friday.r <- c(colnames(accid.cln[3]),expl.fields.r,colnames(accid.cln[20]))
+# temp.accid <- accid.cln[fields.friday.r]
+# 
+# temp.accid.fatal <- subset(accid.cln,accid.cln$P_ISEV=='3')
+# temp.accid.injrd <- subset(accid.cln,accid.cln$P_ISEV=='2')
+# temp.accid.noinj <- subset(accid.cln,accid.cln$P_ISEV=='1')
+# 
+# # Fatal Injuries
+# x11()
+# barplot(table(temp.accid.fatal$C_HOUR_r,temp.accid.fatal$C_WDAY),
+#         main='Fatal Injuries by Day (Mon-Sun)',
+#         xlab='Fatal',
+#         ylab='Frequency',
+#         col=rainbow(length(unique(temp.accid.fatal$C_HOUR_r))),
+#         legend=rownames(table(temp.accid.fatal$C_HOUR_r,temp.accid.fatal$C_WDAY)),
+#         beside=TRUE)
+# # Injuries
+# x11()
+# barplot(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY),
+#         main='Injuries by Day (Mon-Sun)',
+#         xlab='Injured',
+#         ylab='Frequency',
+#         col=rainbow(length(unique(temp.accid.injrd$C_HOUR_r))),
+#         legend=rownames(table(temp.accid.injrd$C_HOUR_r,temp.accid.injrd$C_WDAY)),
+#         beside=TRUE)
+# #Friday night/overnight indeed has a lot. Surprisingly, Sunday overnight was high too.
+# rm(temp.accid,temp.accid.fatal,temp.accid.injrd,temp.accid.noinj, fields.friday.r)
+
+# Top 3 Age Groups by Rd Config
+x11()
+par(mfrow=c(3,1))
+barplot(table(accid.cln.17$C_RCFG_r,accid.cln.17$C_YEAR),
+        main='Occupants by Rd Config',
+        xlab='Drv Age 17-25',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.17$C_RCFG_r))),
+        col=rainbow(6),
+        legend=rownames(table(accid.cln.17$C_RCFG_r,accid.cln.17$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.26$C_RCFG_r,accid.cln.26$C_YEAR),
+        main='Occupants by Rd Config',
+        xlab='Drv Age 26-35',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.26$C_RCFG_r))),
+        col=rainbow(6),
+        #legend=rownames(table(accid.cln.26$C_RCFG_r,accid.cln.26$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.36$C_RCFG_r,accid.cln.36$C_YEAR),
+        main='Occupants by Rd Config',
+        xlab='Drv Age 36-49',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.36$C_RCFG_r))),
+        col=rainbow(6),
+        #legend=rownames(table(accid.cln.36$C_RCFG_r,accid.cln.36$C_YEAR)),
+        beside=TRUE)
+
+
+# Top 3 Age Groups by Traffic Control
+x11()
+par(mfrow=c(3,1))
+barplot(table(accid.cln.17$C_TRAF_r,accid.cln.17$C_YEAR),
+        main='Occupants by Traffic Control',
+        xlab='Drv Age 17-25',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.17$C_TRAF_r))),
+        col=rainbow(8),
+        legend=rownames(table(accid.cln.17$C_TRAF_r,accid.cln.17$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.26$C_TRAF_r,accid.cln.26$C_YEAR),
+        main='Occupants by Traffic Control',
+        xlab='Drv Age 26-35',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.26$C_TRAF_r))),
+        col=rainbow(8),
+        #legend=rownames(table(accid.cln.26$C_TRAF_r,accid.cln.26$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.36$C_TRAF_r,accid.cln.36$C_YEAR),
+        main='Occupants by Traffic Control',
+        xlab='Drv Age 36-49',
+        ylab='Frequency',
+        #col=rainbow(length(unique(accid.cln.36$C_TRAF_r))),
+        col=rainbow(8),
+        #legend=rownames(table(accid.cln.36$C_TRAF_r,accid.cln.36$C_YEAR)),
+        beside=TRUE)
+
+
+# Top 3 Age Groups by Collision Configuration
+x11()
+par(mfrow=c(3,1))
+barplot(table(accid.cln.17$C_CONF_r,accid.cln.17$C_YEAR),
+        main='Occupants by Collision Config',
+        xlab='Drv Age 17-25',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.17$C_CONF_r))),
+        #col=rainbow(8),
+        legend=rownames(table(accid.cln.17$C_CONF_r,accid.cln.17$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.26$C_CONF_r,accid.cln.26$C_YEAR),
+        main='Occupants by Collision Config',
+        xlab='Drv Age 26-35',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.26$C_CONF_r))),
+        #col=rainbow(8),
+        #legend=rownames(table(accid.cln.26$C_CONF_r,accid.cln.26$C_YEAR)),
+        beside=TRUE)
+# x11()
+barplot(table(accid.cln.36$C_CONF_r,accid.cln.36$C_YEAR),
+        main='Occupants by Collision Config',
+        xlab='Drv Age 36-49',
+        ylab='Frequency',
+        col=rainbow(length(unique(accid.cln.36$C_CONF_r))),
+        #col=rainbow(8),
+        #legend=rownames(table(accid.cln.36$C_CONF_r,accid.cln.36$C_YEAR)),
+        beside=TRUE)
 
 
 
-#temp.accid.uniq <- temp.accid[which(!duplicated(temp.accid$occurID)),]
+##### Exploring Association Rules
+#####
 
-rm(driver.fields)
-length(unique(accid.drvs$vehicID))
+fat_rules <- sort(apriori(accid.cln[asso.fields.r],
+                          parameter=list(supp=0.1,conf=0.2,minlen=3),
+                          appearance=list(rhs='P_ISEV=3')),
+                  by='lift')
 
-drvCounts <- data.frame(vehID=unique(accid.drvs$vehicID))
-drvCounts$numDrvs <- 0
-for (i in length(drvCounts$vehID)){
-  drvCounts$numDrvs[i] <- nrow(subset(accid.drvs,((accid.drvs$vehicID==drvCounts$vehID[i])&(accid.drvs$P_USER=='1'))))
-  }
-View(head(drvCounts))
-rm(drvCounts)
+inj_rules <- sort(apriori(accid.cln[asso.fields.r],
+                          parameter=list(supp=0.1,conf=0.2,minlen=3),
+                          appearance=list(rhs='P_ISEV=2')),
+                  by='lift')
 
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# @@@@@ @@@@@@@@@@@@@@@@@@@@ LINE 346 drivers by age @@@@@@@
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+noinj_rules <- sort(apriori(accid.cln[asso.fields.r],
+                            parameter=list(supp=0.1,conf=0.2,minlen=3),
+                            appearance=list(rhs='P_ISEV=1')),
+                    by='lift')
+
+inspect(fat_rules)
+inspect(inj_rules)
+inspect(noinj_rules)
+# cleanup
+rm(fat_rules,inj_rules,noinj_rules)
+
+
+# Decision Tree
+# https://www.youtube.com/watch?v=DYvFapXJoZY
+
 
 #Stacked Bar: P_ISEV Freq by year
 x11()
@@ -370,11 +642,6 @@ ggplot() + geom_bar(aes(y = persnID, x = C_YEAR, fill = C_HOUR_r),
                     data = aggregate(persnID~C_YEAR+C_HOUR_r, data=subset(accid.cln,accid.cln$P_ISEV=='3'), FUN=length),
                     stat="identity") + coord_flip()
 
-
-
-
-
-
 # [OLD, changed accid$exclude build after.]Check number of records/people with P_ISEV=N,
 # in which collision configs and number of vehicles. Two highest counts 30K+ 
 # were in clear two vehicle collisions. Question this field.
@@ -385,10 +652,6 @@ aggregate(P_ID~C_CONF_r, data=subset(accid.cln,accid.cln$P_ISEV=='N'), FUN=lengt
 # 7    two_OneDir     02 31126
 # 8  two_multiDir     02 37222
 #        ...
-
-
-
-
 
 # SUBSET OUT DRIVERS
 
@@ -513,176 +776,3 @@ unknownOccur <- unique(accid[which(accid$V_ID=='UU'|accid$P_ID=='UU'),]$occurID)
 accid.new <- accid[which(!(accid$occurID %in% unknownOccur)),]
 # check
 nrow(accid.new[which(accid.new$V_ID=='UU'|accid.new$P_ID=='UU'),])
-
-
-
-###############################################################################
-### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD ### OLD 
-###############################################################################
-
-sum(is.na(accid$P_ISEV))
-summary(accid$P_ISEV)$coefficients
-?summary
-
-accid.sev <- accid$P_ISEV
-
-as.numeric(table(accid.sev)[5])/length(accid.sev)
-
-# Export to Excel for quick look
-test <- accid[which(accid$V_TYPE=='01'
-                    &accid$C_MNTH=='02' #feb
-                    #&accid$C_YEAR %in% seq(1999,2001,by=1)
-                    &accid$C_YEAR==2001
-                    &accid$C_VEHS %in% c('01','02','03')
-),]
-
-test$C_ID <- paste(test$C_YEAR
-                   ,test$C_MNTH
-                   ,test$C_WDAY
-                   ,test$C_HOUR
-                   ,test$C_CONF
-                   ,test$C_RCFG
-                   ,test$C_WTHR
-                   ,test$C_RSUR
-                   ,test$C_RALN
-                   ,test$C_TRAF
-                   ,sep='')
-
-# remove incidents where # cars not equal # drivers - could have been identical seperate collisions
-# or involving pedestrians, bikes, which I removed the other parties.
-# ONLY LOOKING AT VEHICLE/VEHICLE incidents
-str(test)
-
-test$C_DRVS <- 0
-IncidIndex <- unique(test$C_ID)
-for(i in 1:length(IncidIndex)){#build number of drivers in the incident
-  test$C_DRVS[which(test$C_ID==IncidIndex[i])] <- 
-    nrow(test[which(test$P_USER=='1'&test$C_ID==IncidIndex[i]),])
-  #re-evaluate C_SEV=2 (vs 1), break them out to no inj (P_ISEV=1) to non-fatal inj (P_ISEV=2)
-  #DONE IN EXCEL
-}
-
-str(test$C_SEV)
-str(test$P_ISEV)
-test <- test[which(test$C_DRVS==as.numeric(test$C_VEHS)),]
-
-write.csv(test,"test_accidents.csv",row.names = FALSE)
-rm(test)
-
-test$C_DRVS[which(test$C_ID==IncidIndex[4000])]
-
-
-myaccid.2014 <- accid[which(accid$V_TYPE=='01'
-                            #&accid$C_MNTH=='02' #feb
-                            #&accid$C_YEAR %in% seq(1999,2014,by=5)
-                            &accid$C_YEAR==2014
-                            &accid$C_VEHS %in% c('01','02','03')
-),]
-
-myaccid.2014$C_ID <- paste(myaccid.2014$C_YEAR
-                           ,myaccid.2014$C_MNTH
-                           ,myaccid.2014$C_WDAY
-                           ,myaccid.2014$C_HOUR
-                           ,"_"
-                           ,myaccid.2014$C_CONF
-                           ,myaccid.2014$C_RCFG
-                           ,myaccid.2014$C_WTHR
-                           ,myaccid.2014$C_RSUR
-                           ,myaccid.2014$C_RALN
-                           ,myaccid.2014$C_TRAF
-                           ,sep='')
-
-# remove incidents where # cars not equal # drivers - could have been identical seperate collisions
-# or involving pedestrians, bikes, which I removed the other parties.
-# ONLY LOOKING AT VEHICLE/VEHICLE incidents
-
-myaccid.1999$C_DRVS <- 0
-IncidIndex <- unique(myaccid.1999$C_ID)
-for(i in 1:length(IncidIndex)){
-  myaccid.1999$C_DRVS[which(myaccid.1999$C_ID==IncidIndex[i])] <- 
-    nrow(myaccid.1999[which(myaccid.1999$P_USER=='1'&myaccid.1999$C_ID==IncidIndex[i]),])
-}
-
-myaccid.2014 <- myaccid.2014[which(myaccid.2014$C_DRVS==as.numeric(myaccid.2014$C_VEHS)),]
-
-str(myaccid)
-table(myaccid$C_YEAR)
-
-write.csv(myaccid.1999,"accidents_1999.csv",row.names = FALSE)
-write.csv(myaccid.2004,"accidents_2004.csv",row.names = FALSE)
-write.csv(myaccid.2009,"accidents_2009.csv",row.names = FALSE)
-write.csv(myaccid.2014,"accidents_2014.csv",row.names = FALSE)
-
-table(myaccid$V_TYPE)
-table(accid$C_VEHS)[4]/5860405
-head(myaccid)
-
-
-
-#############################################################
-###########################STAGE 2###########################
-#############################################################
-###COUNT NUMBER OF ACCIDENTS PER AGE GROUP############
-
-
-
-accid2.1999 <- read.csv("F:/Marsh/accidents_1999_preStage2.csv"
-                        ,header = TRUE,stringsAsFactors = FALSE)
-accid2.2004 <- read.csv("F:/Marsh/accidents_2004_preStage2.csv"
-                        ,header = TRUE,stringsAsFactors = FALSE)
-accid2.2009 <- read.csv("F:/Marsh/accidents_2009_preStage2.csv"
-                        ,header = TRUE,stringsAsFactors = FALSE)
-accid2.2014 <- read.csv("F:/Marsh/accidents_2014_preStage2.csv"
-                        ,header = TRUE,stringsAsFactors = FALSE)
-
-names(accid2.1999)[1] <- paste("C_ID")
-names(accid2.2004)[1] <- paste("C_ID")
-names(accid2.2009)[1] <- paste("C_ID")
-names(accid2.2014)[1] <- paste("C_ID")
-
-ageGrp <- c("Under 17","17-26","26-40","41-60","61-99")
-
-summ.1999 <- data.frame()
-for(i in 1:length(unique(accid2.1999$C_SEV_g))){
-  for(j in 1:length(ageGrp)){
-    summ.1999[i,j] <- length(unique(accid2.1999$C_ID[which(accid2.1999$C_SEV_g==i
-                                                           &accid2.1999$C_MINA==ageGrp[j])]))
-  }
-}
-
-summ.2004 <- data.frame()
-for(i in 1:length(unique(accid2.2004$C_SEV_g))){
-  for(j in 1:length(ageGrp)){
-    summ.2004[i,j] <- length(unique(accid2.2004$C_ID[which(accid2.2004$C_SEV_g==i
-                                                           &accid2.2004$C_MINA==ageGrp[j])]))
-  }
-}
-
-summ.2009 <- data.frame()
-for(i in 1:length(unique(accid2.2009$C_SEV_g))){
-  for(j in 1:length(ageGrp)){
-    summ.2009[i,j] <- length(unique(accid2.2009$C_ID[which(accid2.2009$C_SEV_g==i
-                                                           &accid2.2009$C_MINA==ageGrp[j])]))
-  }
-}
-
-summ.2014 <- data.frame()
-for(i in 1:length(unique(accid2.2014$C_SEV_g))){
-  for(j in 1:length(ageGrp)){
-    summ.2014[i,j] <- length(unique(accid2.2014$C_ID[which(accid2.2014$C_SEV_g==i
-                                                           &accid2.2014$C_MINA==ageGrp[j])]))
-  }
-}
-
-write.csv(summ.1999,"accidents_1999_postStage2.csv")
-write.csv(summ.2004,"accidents_2004_postStage2.csv")
-write.csv(summ.2009,"accidents_2009_postStage2.csv")
-write.csv(summ.2014,"accidents_2014_postStage2.csv")
-
-View(head(summ.1999))
-# select every 5 years
-# scope <- seq(1999,2014,by=5)
-# myaccid <- accid[which(accid$C_YEAR==1999),]
-# for(i in 2:length(scope)){
-#   myaccid <- rbind(myaccid,accid[which(accid$C_YEAR==scope[i]),],header=FALSE)
-# }

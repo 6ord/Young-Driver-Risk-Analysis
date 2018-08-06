@@ -9,7 +9,7 @@ accid.cln$P_ISEV <- as.factor(accid.cln$P_ISEV)
 
 # Build Age Groups
 accid.cln$P_AGE_r <- cut(as.numeric(accid.cln$P_AGE),
-                         breaks = c(0,17,26,36,50,65,99),
+                         breaks = c(0,17,26,36,50,65,100),
                          labels = c('0-16','17-25','26-35','36-49','50-64','65+'),
                          right=FALSE)
 # Build Time of Day

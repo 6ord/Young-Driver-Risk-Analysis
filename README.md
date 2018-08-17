@@ -15,17 +15,18 @@ https://www.kaggle.com/tbsteal/canadian-car-accidents-19942014
 
 Conceptual use of this data can be found here (https://prezi.com/view/LquWzGw3HZMw1s6x849h/) - Light analysis was done between R and Excel Power Pivot. This project will extend the depth of the analysis, with a focus on using open source tools.
 
-# Technique & Tools:
-
-The sheer size of this dataset will require the use of a Hadoop cluster (Hive, Pig, Spark) to conduct the data discovery phase efficiently. After that, I’d like to attempt using Bayesian Inference to investigate whether there’s a causal relationship between gender, age and fatality. There’s also an opportunity to look at yearly trends, and/or validate common reasoning for high insurance prices for young drivers.
+# Getting this R Project Started:
+1. Install arules and ggplot2 packages
+2. Set working directory
+3. Run lines 34-37 in accidents.r
 
 # About the R Scripts:
 
 accid_base.r
 - Imports original dataset
-- Imports 3rd party libraries
 - Builds user defined attributes
 - Addresses missing values
+- Build vehicle driver age attribute
 
 accid_range.r
 - Band age into age groups
@@ -34,9 +35,12 @@ accid_range.r
 - Map/categorize road configuration
 - Map/categorize traffic signal type
 
+accid_reduceToOccur.r
+- Creates the 'per occurrence' dataset from the 'per person' level
+
 accidents.r
+- Imports 3rd party libraries
 - Build data summary within R
-- Build vehicle driver age attribute (to be moved to accid_base.r)
-- Frequency plots by injury level
-- Frequency plots by driver age group
+- Frequency plots
 - Association Rules
+- Chi Square tests

@@ -163,7 +163,24 @@ myBarplot <- function(main='no title',bar,grp,numBars=NA){
 }
 # myLineplot Function
 # 
-myLinplot <- function(main='no title',bar,grp,numBars=NA){
-  # TBD 
+myLineplot <- function(main='no title',xLab='xlabel',yLab='Frequency',indep,grp){
+  ggplot(data=data.frame(table(xaxis=indep,lines=grp)),
+         aes(x=xaxis
+            ,y=Freq
+            ,group=lines
+            ,colour=lines
+            #,shape=sex
+            )) +
+    geom_line() +
+    #geom_bar()+
+    #geom_point() +
+    xlab(xLab) +
+    ylab(yLab) +
+    ggtitle(main)
 }
 
+# x11()
+#test <- data.frame(table(yr=accid.cln.occur$C_YEAR,age=accid.cln.occur$mnDRV_AGE_r))
+#ggplot(data=test,aes(x=yr,y=Freq,group=age,colour=age))+geom_line()+geom_point()
+#
+# myLineplot(main='no title',xLab='xlabel',indep=accid.cln.occur$C_YEAR,grp=accid.cln.occur$mnDRV_AGE_r)

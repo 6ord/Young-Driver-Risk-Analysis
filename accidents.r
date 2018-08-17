@@ -15,13 +15,16 @@ library(arules)
 #library(C50)
 # install.packages("rpart")
 #library(rpart)
-#library(ggplot2)
+library(ggplot2)
 # spark_install(version = "2.1.0")
 # devtools::install_github("rstudio/sparklyr")
 
 
 #setwd('F:\\Ryerson\\CKME136_Capstone\\repository')
-setwd('C:\\Users\\trunk\\Downloads\\BigData\\CKME136_Capstone\\repository')
+#setwd('C:\\Users\\trunk\\Downloads\\BigData\\CKME136_Capstone\\repository')
+setwd(getwd())
+print(paste('Working directory set to:',getwd()))
+
 
 #source('dictionary.r') #builds data dictionary from PDF
 #ALSO UNCOMMENT LINES XX-XX IF BUILDING DICTIONARY **********************************************
@@ -35,6 +38,8 @@ rm(startTime)
 
 #####################################################
 # SKIP TO LINE 135 to begin subsetting and plotting #
+#####################################################
+######### LINE 195 & 351 for ggplot lines  ##########
 #####################################################
 
 # There's NA's coherced from banding age. The below ensures at least all
@@ -181,6 +186,8 @@ myBarplot('Injuries by Day (Mon-Sun)',temp.accid.injrd$C_HOUR_r,temp.accid.injrd
 ######################################################################
 rm(temp.accid,temp.accid.fatal,temp.accid.injrd,temp.accid.noinj, fields.friday.r)
 
+
+
 # Fatalities, Injuries and non-injuries by Driver Age
 # 
 x11()
@@ -188,6 +195,19 @@ par(mfrow=c(3,1),mar = c(5,4,4,8))
 myBarplot("Fatal Injuries by their Drivers' Age",accid.cln.fatal$DRV_AGE_r,accid.cln.fatal$C_YEAR)
 myBarplot("Injuries by their Drivers' Age",accid.cln.injrd$DRV_AGE_r,accid.cln.injrd$C_YEAR)
 myBarplot("Non-Injuries by their Drivers' Age",accid.cln.noinj$DRV_AGE_r,accid.cln.noinj$C_YEAR)
+
+
+#GGPLOT LINE GRAPHS
+x11()
+par(mfrow=c(3,1))
+myLineplot(main="Fatal Injuries by their Drivers' Age",xLab='Year',
+           indep=accid.cln.fatal$C_YEAR,grp=accid.cln.fatal$DRV_AGE_r)
+myLineplot(main="Injuries by their Drivers' Age",xLab='Year',
+           indep=accid.cln.injrd$C_YEAR,grp=accid.cln.injrd$DRV_AGE_r)
+myLineplot(main="Non-Injuries by their Drivers' Age",xLab='Year',
+           indep=accid.cln.noinj$C_YEAR,grp=accid.cln.noinj$DRV_AGE_r)
+
+
 
 # Fatalities, Injuries and non-injuries by Rd Config
 # 
@@ -331,6 +351,18 @@ myBarplot('Fatal Collisions by Min Drv Age',occur.fatal$mnDRV_AGE_r,occur.fatal$
 myBarplot('Injury Collisions by Min Drv Age',occur.injry$mnDRV_AGE_r,occur.injry$C_YEAR)
 myBarplot('Non-Injury Collisions by Min Drv Age',occur.noInj$mnDRV_AGE_r,occur.noInj$C_YEAR)
 
+
+#GGPLOT LINE GRAPHS
+x11()
+#par(mfrow=c(3,1))
+# myLineplot(main="Fatal Collisions by Min Drv Age",xLab='Year',
+#            indep=occur.fatal$C_YEAR,grp=occur.fatal$mnDRV_AGE_r)
+myLineplot(main="Injury Collisions by Min Drv Age",xLab='Year',
+           indep=occur.injry$C_YEAR,grp=occur.injry$mnDRV_AGE_r)
+myLineplot(main="Non-Injury Collisions by Min Drv Age",xLab='Year',
+           indep=occur..noinj$C_YEAR,grp=occur.noinj$mnDRV_AGE_r)
+
+
 # Fatal, Non-Fatal, and No Injuries by Time
 x11()
 #par(mfrow=c(1,3))
@@ -435,9 +467,9 @@ accidYrList <- list(accid.1999,accid.2000,accid.2001,accid.2002,accid.2003,
                     accid.2014)
 
 rm(accid.1999,accid.2000,accid.2001,accid.2002,accid.2003,
-                      accid.2004,accid.2005,accid.2006,accid.2007,accid.2008,
-                      accid.2009,accid.2010,accid.2011,accid.2012,accid.2013,
-                      accid.2014)
+   accid.2004,accid.2005,accid.2006,accid.2007,accid.2008,
+   accid.2009,accid.2010,accid.2011,accid.2012,accid.2013,
+   accid.2014)
 
 #conduct chisq test of indep for each year, see if p-value increases, indicating less/more weight
 #of age on collision severity.
@@ -447,13 +479,31 @@ AgeCollSev.chisqStats <- sapply(c(1:16),
                                   as.numeric(chisq.test(table(accidYrList[[x]]$mnDRV_AGE_r,accidYrList[[x]]$collSev))$statistic)
                                   }
                                 )
+AgeCollSev.pValues <- sapply(c(1:16),
+                                function(x){
+                                  as.numeric(chisq.test(table(accidYrList[[x]]$mnDRV_AGE_r,accidYrList[[x]]$collSev))$p.value)
+                                  }
+                                )
+
 x11()
-plot(AgeCollSev.chisqStats,
-     main="Chi Sq Test between Youngest Driver of Collision and Collision Severity",
-     ylab="Test Statistic",
-     xlab="Year: 1999-2014")
-lines(AgeCollSev.chisqStats)
-#Test statistic does appear to increase over the 16 years, indicating more weight of age on collision severity.
+ggplot(data.frame(yr=c(1999:2014),stat=AgeCollSev.chisqStats),
+       aes(x=yr,y=stat,group=1))+
+        geom_line()+
+        geom_point()+
+        xlab('Year') +
+        ylab('Test Statistic') +
+        ggtitle('Chi Square Test of Indep bw Youngest Driver and Collision Severity')
+
+x11()
+ggplot(data.frame(yr=c(1999:2014),stat=AgeCollSev.pValues),
+       aes(x=yr,y=stat,group=1))+
+        geom_line()+
+        geom_point()+
+        xlab('Year') +
+        ylab('p-value') +
+        ggtitle('Chi Square Test of Indep bw Youngest Driver and Collision Severity')
+
+rm(AgeCollSev.chisqStats,AgeCollSev.pValues)
 
 #Association Rules
 
@@ -471,7 +521,7 @@ table(accid.cln.fatOrNot$collSev)
 #Association for injury accidents and fatal accidents
 #
 inj_rules <- sort(apriori(accid.cln.injOrNot[asso.fields.r.occur]
-                          ,parameter=list(supp=0.10,conf=0.5,minlen=3)
+                          ,parameter=list(supp=0.10,conf=0.5,minlen=4)
                           ,appearance=list(rhs='collSev=injry'))
                   ,by='support')
 inspect(inj_rules)
